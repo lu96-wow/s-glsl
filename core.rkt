@@ -1,7 +1,7 @@
 #lang racket/base
 
 ;; ============================================================
-;; GLSL 核心（Layer 0）——全部函数返回字符串，不含换行
+;; GLSL 核心（Layer 0）——字符串生成原语，全部返回字符串、不含换行
 ;;
 ;; 规则：
 ;;   1. 文本都是字符串（类型 "vec2"、变量 "aPos"、运算符 "+"）；
@@ -9,19 +9,27 @@
 ;;   2. 表达式不带分号；语句带分号/花括号；花括号内用空格而非换行。
 ;;   3. 二元/一元/三元永远自带括号，优先级天然安全。
 ;;   4. 名字全部 glsl- 前缀，与 Racket 核心零冲突。
-;;   5. 换行/缩进不属于核心：用 glsl-pretty 统一美化。
-;;      例外：#version 等预处理指令在 GLSL 中必须独占一行，
-;;      所以 glsl-version 保留结尾 \n（语义要求，非格式化）。
+;;   5. 换行/缩进不属于核心（见 pretty.rkt）；
+;;      例外：#version 等预处理指令必须独占一行，所以 glsl-version 保留结尾 \n。
 ;;
-;; 之后的重写层（Layer 1）只做"位置驱动改名"，
-;; 把用户表面(vec2 / set! / if / + ...)重写成本文件的调用。
+;; 分层：
+;;   core.rkt          本层：字符串生成原语
+;;   pretty.rkt        美化（字符串 → 多行缩进文本）
+;;   glsl-program.rkt  (glsl ...) 的产物：带源映射的 GLSL 程序
+;;   rewrite.rkt       (glsl ...) 宏（表面语法 → core 调用）
 ;; ============================================================
 
 (require racket/format racket/string)
 
 (provide
- ;; 拼装 / 美化
- glsl-shader glsl-pretty glsl-version glsl-raw
+ ;; 拼装
+ glsl-shader glsl-version glsl-raw
+ ;; 预处理指令
+ glsl-macro-define glsl-macro-undef
+ glsl-macro-ifdef glsl-macro-ifndef glsl-macro-if glsl-macro-elif glsl-macro-else glsl-macro-endif
+ glsl-macro-error glsl-macro-pragma glsl-macro-extension
+ ;; 共享小工具
+ ->str ident-char?
  ;; 声明
  glsl-decl glsl-in glsl-out glsl-uniform glsl-const glsl-layout glsl-layout-qual
  ;; 表达式
@@ -31,7 +39,7 @@
  glsl-stmt glsl-block glsl-if glsl-for glsl-while glsl-do-while
  glsl-switch glsl-break glsl-continue glsl-return glsl-discard
  ;; 函数 / 结构
- glsl-param glsl-fn glsl-field-decl glsl-struct)
+ glsl-param glsl-fn glsl-field-decl glsl-struct-decl)
 
 ;; ---------- 内部工具 ----------
 
@@ -42,6 +50,10 @@
     [(and (exact? x) (rational? x) (not (integer? x)))
      (error 'glsl "GLSL 没有有理数字面量：~s。请写小数（如 0.5）或用 (/ 1.0 2.0)" x)]
     [else (~a x)]))
+
+;; GLSL 标识符字符（pretty 的词边界 / gl-error 的标识符识别共用）
+(define (ident-char? c)
+  (or (char-alphabetic? c) (char-numeric? c) (char=? c #\_)))
 
 ;; 若是 "{" 开头的块就不重复包，否则包成块（单行，空格分隔）
 (define (block? x) (and (string? x) (string-prefix? x "{")))
@@ -62,110 +74,11 @@
 (define (join-spaces xs)
   (string-join (map ->str xs) " "))
 
-;; ---------- 0. 拼装 / 美化 ----------
+;; ---------- 0. 拼装 ----------
 
-;; 拼装：片段之间用空格分隔（换行交给 glsl-pretty）
+;; 拼装：片段之间用空格分隔（换行交给 pretty.rkt 的 glsl-pretty）
 (define (glsl-shader . parts)
   (string-join (map ->str parts) " "))
-
-;; 美化：按 ; { } 换行，按 {} 深度缩进；保留字符串与已有的 \n
-(define (glsl-pretty s)
-  (define n (string-length s))
-  (define lines '())
-  (define cur (box ""))
-  (define brace 0)
-  (define paren 0)
-  (define in-str? #f)
-  (define started? #f)
-
-  (define (indent!)
-    (set-box! cur (string-append (make-string (* 2 brace) #\space) (unbox cur))))
-
-  (define (flush!)
-    (when (not (string=? (unbox cur) ""))
-      (set! lines (cons (unbox cur) lines))
-      (set-box! cur "")
-      (set! started? #f)))
-
-  ;; 从 i 起跳过空白，返回下一个非空白下标（无则 n）
-  (define (skip-ws i)
-    (cond [(>= i n) n]
-          [(char-whitespace? (string-ref s i)) (skip-ws (add1 i))]
-          [else i]))
-
-  (define (ident-char? c)
-    (or (char-alphabetic? c) (char-numeric? c) (char=? c #\_)))
-
-  ;; i 处是否以 word 开头，且 word 后不是标识符字符（词边界）
-  (define (word-at? i word)
-    (define wl (string-length word))
-    (and (<= (+ i wl) n)
-         (equal? (substring s i (+ i wl)) word)
-         (or (= (+ i wl) n)
-             (not (ident-char? (string-ref s (+ i wl)))))))
-
-  ;; j 处是否形如 "名字;" 或 "名字["（接口块实例名，} 之后应保持同行）
-  (define (instance-name? j)
-    (and (< j n)
-         (ident-char? (string-ref s j))
-         (let scan ([k j])
-           (cond
-             [(>= k n) #f]
-             [(ident-char? (string-ref s k)) (scan (add1 k))]
-             [(char=? (string-ref s k) #\space) (scan (add1 k))]
-             [else (memv (string-ref s k) '(#\; #\[))]))))
-
-  (let loop ([i 0])
-    (when (< i n)
-      (define c (string-ref s i))
-      (define cs (string c))
-      (cond
-        ;; 字符串内部：原样复制，遇到 " 结束
-        [in-str?
-         (set-box! cur (string-append (unbox cur) cs))
-         (when (char=? c #\") (set! in-str? #f))]
-        [(char=? c #\")
-         (set! in-str? #t)
-         (unless started? (indent!) (set! started? #t))
-         (set-box! cur (string-append (unbox cur) cs))]
-        [(char=? c #\newline)
-         (flush!)]
-        [(char=? c #\()
-         (set! paren (add1 paren))
-         (unless started? (indent!) (set! started? #t))
-         (set-box! cur (string-append (unbox cur) cs))]
-        [(char=? c #\))
-         (set! paren (sub1 paren))
-         (set-box! cur (string-append (unbox cur) cs))]
-        [(char=? c #\{)
-         (unless started? (indent!) (set! started? #t))
-         (set-box! cur (string-append (unbox cur) cs))
-         (flush!)
-         (set! brace (add1 brace))]
-        [(char=? c #\})
-         (set! brace (sub1 brace))
-         (flush!)
-         (indent!)
-         (set! started? #t)
-         (set-box! cur (string-append (unbox cur) cs))
-         ;; } 之后：仅 else / while / ; / , / 接口块实例名 保持同行，否则换行
-         (let ([j (skip-ws (add1 i))])
-           (unless (or (and (< j n) (memv (string-ref s j) '(#\; #\,)))
-                       (word-at? j "else")
-                       (word-at? j "while")
-                       (instance-name? j))
-             (flush!)))]
-        [(and (char=? c #\;) (zero? paren))
-         (set-box! cur (string-append (unbox cur) cs))
-         (flush!)]
-        [(char-whitespace? c)
-         (when started? (set-box! cur (string-append (unbox cur) cs)))]
-        [else
-         (unless started? (indent!) (set! started? #t))
-         (set-box! cur (string-append (unbox cur) cs))])
-    (loop (add1 i))))
-  (flush!)
-  (string-join (reverse lines) "\n"))
 
 (define (glsl-version n [profile #f])
   (if profile
@@ -173,6 +86,51 @@
       (format "#version ~a\n" (->str n))))
 
 (define (glsl-raw s) (->str s))
+
+;; ---------- 0.5 预处理指令 ----------
+
+;; 预处理指令都必须独占一行，所以每个都带结尾 \n。
+;; 内容不参与 pretty 的 ; { } ( ) 重排——pretty.rkt 对「行首 #」整行原样复制。
+
+;; #define：object-like（params=#f）或 function-like（params=参数名字符串列表）
+(define (glsl-macro-define name params body)
+  (define b (->str body))
+  (define body-part (if (string=? b "") "" (format " ~a" b)))
+  (if params
+      (format "#define ~a(~a)~a\n"
+              (->str name) (string-join (map ->str params) ", ") body-part)
+      (format "#define ~a~a\n" (->str name) body-part)))
+
+(define (glsl-macro-undef name)
+  (format "#undef ~a\n" (->str name)))
+
+(define (glsl-macro-ifdef name)
+  (format "#ifdef ~a\n" (->str name)))
+
+(define (glsl-macro-ifndef name)
+  (format "#ifndef ~a\n" (->str name)))
+
+(define (glsl-macro-if expr)
+  (format "#if ~a\n" (->str expr)))
+
+(define (glsl-macro-elif expr)
+  (format "#elif ~a\n" (->str expr)))
+
+(define (glsl-macro-else)
+  "#else\n")
+
+(define (glsl-macro-endif)
+  "#endif\n")
+
+(define (glsl-macro-error msg)
+  (format "#error ~a\n" (->str msg)))
+
+(define (glsl-macro-pragma body)
+  (format "#pragma ~a\n" (->str body)))
+
+;; #extension 名字 : 行为（行为 = enable / disable / warn / require）
+(define (glsl-macro-extension name behavior)
+  (format "#extension ~a : ~a\n" (->str name) (->str behavior)))
 
 ;; ---------- 1. 声明 ----------
 
@@ -303,6 +261,6 @@
 (define (glsl-field-decl type name)
   (format "~a ~a;" (->str type) (->str name)))
 
-(define (glsl-struct name . fields)
+(define (glsl-struct-decl name . fields)
   (format "struct ~a { ~a };"
           (->str name) (join-spaces fields)))
