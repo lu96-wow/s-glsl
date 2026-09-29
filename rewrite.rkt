@@ -24,14 +24,17 @@
                      racket/list
                      racket/syntax
                      "core.rkt"
+                     "glsl-interface.rkt"
                      "glsl-program.rkt")
          "core.rkt"
          "pretty.rkt"
+         "glsl-interface.rkt"
          "glsl-program.rkt")
 
 (provide glsl glsl-unquote
          (all-from-out "core.rkt")
          (all-from-out "pretty.rkt")
+         (all-from-out "glsl-interface.rkt")
          (all-from-out "glsl-program.rkt"))
 
 (begin-for-syntax
@@ -41,28 +44,9 @@
   ;; 重写各层只把它当普通原子透传，最后由 tree->syntax 换成使用侧的 Racket 表达式。
   (struct splice-marker (index) #:transparent)
 
-  ;; ---------- 类型名集合 ----------
-  (define builtin-types
-    (apply set
-           (append
-            '(float int uint bool double void atomic_uint)
-            (for*/list ([p '("" "i" "u" "b" "d")] [n '(2 3 4)])
-              (string->symbol (format "~avec~a" p n)))
-            (for*/list ([p '("" "d")] [n '(2 3 4)])
-              (string->symbol (format "~amat~a" p n)))
-            (for*/list ([p '("" "d")] [c '(2 3 4)] [r '(2 3 4)])
-              (string->symbol (format "~amat~ax~a" p c r)))
-            '(sampler1D sampler2D sampler3D samplerCube
-              sampler2DArray samplerCubeArray sampler2DMS samplerBuffer
-              sampler1DShadow sampler2DShadow samplerCubeShadow
-              sampler2DArrayShadow samplerCubeArrayShadow
-              isampler1D isampler2D isampler3D isamplerCube isampler2DArray
-              isamplerCubeArray isampler2DMS isamplerBuffer
-              usampler1D usampler2D usampler3D usamplerCube usampler2DArray
-              usamplerCubeArray usampler2DMS usamplerBuffer
-              image1D image2D image3D imageCube image2DArray imageBuffer
-              iimage1D iimage2D iimage3D iimageCube iimage2DArray iimageBuffer
-              uimage1D uimage2D uimage3D uimageCube uimage2DArray uimageBuffer))))
+  ;; ---------- 内建类型名集合 ----------
+  ;; 单一来源：glsl-interface.rkt 的类型模型（保证与类型反射一致）
+  (define builtin-types (list->seteq builtin-glsl-type-names))
 
   ;; 当前类型集合（含本块收集的 struct 名）
   (define type-names (make-parameter builtin-types))
@@ -440,6 +424,81 @@
               (list 'glsl-macro-extension (symbol->string (car args)) (symbol->string (cadr args)))]
              [else #f]))))
 
+  ;; ---------- 接口反射：声明 → glsl-type / glsl-var ----------
+  ;; 只"读"声明，不做组合（不合并多个 shader、不生成 setter）。
+  ;; ★ 暂定：类型模型与反射形状见 glsl-interface.rkt，尚未定稿，可能调整。
+
+  ;; struct 定义：名字 → 字段 form 表
+  (define (struct-def-of d)
+    (and (pair? d) (eq? (car d) 'struct) (symbol? (cadr d))
+         (cons (cadr d) (cddr d))))
+
+  (define (collect-struct-defs datas)
+    (for/fold ([h (hash)]) ([d (in-list datas)])
+      (cond [(struct-def-of d) => (lambda (p) (hash-set h (car p) (cdr p)))]
+            [else h])))
+
+  ;; layout 项 → 接口里的统一表示：每项都是 (名) 或 (名 值)
+  (define (layout-item->iface it)
+    (if (pair? it) it (list it)))
+
+  ;; 表面类型 → glsl-type（struct 名查 struct-defs，其余查内建表）
+  (define (surface->glsl-type t struct-defs memo)
+    (cond
+      [(symbol? t)
+       (or (hash-ref memo t #f)
+           (cond
+             [(hash-ref struct-defs t #f)
+              => (lambda (fields)
+                   (define ty (glsl-struct-type t (for/list ([f (in-list fields)])
+                                                    (field->glsl-var f struct-defs memo))))
+                   (hash-set! memo t ty) ty)]
+             [else (or (builtin-glsl-type t)
+                       (error 'glsl "接口反射：未知类型 ~s" t))]))]
+      [(array-type? t)
+       (glsl-array-type (surface->glsl-type (cadr t) struct-defs memo)
+                        (if (null? (cddr t)) #f (caddr t)))]
+      [(block-type? t)
+       (glsl-block-type (cadr t) (for/list ([f (in-list (cddr t))])
+                                   (field->glsl-var f struct-defs memo)))]
+      [else (error 'glsl "接口反射：坏类型 ~s" t)]))
+
+  ;; struct/block 成员 form → glsl-var
+  (define (field->glsl-var f struct-defs memo)
+    (define-values (quals after layout)
+      (if (and (pair? f) (eq? (car f) 'layout))
+          (let*-values ([(items rest) (collect-layout-items (cdr f))]
+                        [(qs rest*) (collect-quals rest)])
+            (values (map string->symbol qs) rest* (map layout-item->iface items)))
+          (let-values ([(qs rest) (collect-quals f)])
+            (values (map string->symbol qs) rest '()))))
+    (glsl-var (cadr after) (surface->glsl-type (car after) struct-defs memo) quals layout))
+
+  ;; 顶层声明 form → glsl-var（不是声明、或没有变量名 → #f）
+  (define (decl->glsl-var d struct-defs memo)
+    (define-values (quals after layout)
+      (cond
+        [(and (pair? d) (eq? (car d) 'layout))
+         (let*-values ([(items rest) (collect-layout-items (cdr d))]
+                       [(qs rest*) (collect-quals rest)])
+           (values (map string->symbol qs) rest* (map layout-item->iface items)))]
+        [(declaration? d)
+         (let-values ([(qs rest) (collect-quals d)])
+           (values (map string->symbol qs) rest '()))]
+        [else (values '() '() '())]))
+    (and (pair? after) (pair? (cdr after)) (symbol? (cadr after))
+         (glsl-var (cadr after) (surface->glsl-type (car after) struct-defs memo) quals layout)))
+
+  ;; 全部顶层声明 → 接口 datum
+  (define (interface-datum datas)
+    (define struct-defs (collect-struct-defs datas))
+    (define memo (make-hash))
+    (define vars
+      (for/fold ([acc '()]) ([d (in-list datas)])
+        (define v (decl->glsl-var d struct-defs memo))
+        (if v (cons v acc) acc)))
+    (glsl-interface->datum (glsl-interface (reverse vars))))
+
   ;; ---------- 顶层 ----------
   (define (rw-top t)
     (cond
@@ -499,31 +558,17 @@
        (for ([d datas])
          (when (and (pair? d) (eq? 'struct (car d)))
            (type-names (set-add (type-names) (cadr d)))))
+       ;; 类型化接口反射（编译期算好）——须在 struct 名进类型集合之后
+       (define iface-datum (interface-datum datas))
        ;; 源文件路径 → 字符串（拿不到则 #f）
        (define (src-path-string f)
          (define src (syntax-source f))
          (cond [(path? src) (path->string src)]
                [src (format "~a" src)]
                [else #f]))
-       ;; 一个 form 的源信息：(src-path src-line src-col src-span text)
+       ;; 一个 form 的源信息：(src-path src-line text) —— 源映射只到行
        (define (source-info f)
-         (list (src-path-string f)
-               (syntax-line f) (syntax-column f) (syntax-span f) (syntax->datum f)))
-       ;; 遍历 syntax 收集每个标识符的 (名字 路径 行 列)，报错时据此直接指到标识符。
-       ;; ★ 跳过 glsl-unquote 子树：那里的标识符是 Racket 代码，不属于 GLSL 名字表。
-       (define (collect-identifiers f)
-         (define dat (syntax->datum f))
-         (if (and (pair? dat) (eq? (car dat) 'glsl-unquote))
-             '()
-             (syntax-case f ()
-               [(a . b) (append (collect-identifiers #'a) (collect-identifiers #'b))]
-               [id (identifier? #'id)
-                   (list (list (symbol->string (syntax->datum #'id))
-                               (src-path-string #'id)
-                               (syntax-line #'id)
-                               (syntax-column #'id)))]
-               [_ '()])))
-       (define tokens (apply append (map collect-identifiers forms)))
+         (list (src-path-string f) (syntax-line f) (syntax->datum f)))
 
        ;; 带标记的 datum 树 → 语法对象：普通原子用宏定义侧上下文（glsl-* 可解析），
        ;; splice-marker 换成使用侧语法（Racket 表达式原样求值，须返回字符串/glsl-program）。
@@ -533,11 +578,11 @@
            [(pair? t) (cons (tree->syntax (car t)) (tree->syntax (cdr t)))]
            [else (datum->syntax #'make-glsl-program t)]))
 
-       ;; 生成 (make-glsl-program (list 片段...) '(源信息...) '(标识符表...))。
-       ;; 片段 = 要运行的代码（rw-top 结果 / glsl-unquote 表达式）；
-       ;; 源信息/标识符表 = 要引用的数据。代码与数据分列，避免混写 quote 导致的括号/转义错误。
+       ;; 生成 (make-glsl-program (list 片段...) '(源信息...) '(接口反射...))。
+       ;; 片段 = 要运行的代码（rw-top 结果 / glsl-unquote 表达式）；源信息/接口 = 要引用的数据。
+       ;; 代码与数据分列，避免混写 quote 导致的括号/转义错误。
        (with-syntax ([(part ...) (map (lambda (d) (tree->syntax (rw-top d))) datas)])
          #`(make-glsl-program
             (list part ...)
             '#,(map source-info forms)
-            '#,tokens)))]))
+            '#,iface-datum)))]))

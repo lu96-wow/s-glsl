@@ -14,7 +14,7 @@
 
 (require racket/string "core.rkt")   ; string-join / ident-char?
 
-(provide glsl-pretty-line-map glsl-pretty)
+(provide glsl-pretty)
 
 ;; ---------- 美化状态（不可变，靠 struct-copy 推进） ----------
 
@@ -117,35 +117,9 @@
     [else
      (pstate-append (pstate-start st) cs)]))
 
-;; 美化 + 在 marks（非降序 raw 下标）处记录"该字符落在第几行"。
-;; ★ glsl-unquote 拼接的片段可能为空串：此时 start==end，marks 出现重复；
-;;   末尾空片段的 mark 还可能等于 n（串长）。所以这里：
-;;     - 每个下标消费"所有"相等的 mark（重复 mark 记同一行）
-;;     - 迭代到 i = n 也处理（n 处的 mark 记最后一行）
-;; 返回 (values 美化串 各行号)，行号与 marks 一一对应。
-(define (glsl-pretty-line-map s marks)
-  (define n (string-length s))
-  (define (go i st marks-left recorded)
-    (cond
-      [(> i n)
-       (let ([final (pstate-flush st)])
-         (values (string-join (reverse (pstate-lines final)) "\n")
-                 (reverse recorded)))]
-      [(and (pair? marks-left) (= i (car marks-left)))
-       (define line (if (< i n)
-                        (add1 (length (pstate-lines st)))
-                        (max 1 (length (pstate-lines (pstate-flush st))))))
-       (define rest (let loop ([ms marks-left])
-                      (if (and (pair? ms) (= i (car ms))) (loop (cdr ms)) ms)))
-       (define cnt (- (length marks-left) (length rest)))
-       (go i st rest
-           (let loop ([k cnt] [r recorded])
-             (if (zero? k) r (loop (sub1 k) (cons line r)))))]
-      [else
-       (go (add1 i) (if (< i n) (pstate-advance s n st i) st) marks-left recorded)]))
-  (go 0 (pstate '() "" 0 0 #f #f #f) marks '()))
-
-;; 美化（不记录位置）：字符串 → 多行缩进文本
+;; 美化：字符串 → 多行缩进文本（确定性纯函数）
 (define (glsl-pretty s)
-  (define-values (str _) (glsl-pretty-line-map s '()))
-  str)
+  (define n (string-length s))
+  (define final (for/fold ([st (pstate '() "" 0 0 #f #f #f)]) ([i (in-range n)])
+                  (pstate-advance s n st i)))
+  (string-join (reverse (pstate-lines (pstate-flush final))) "\n"))

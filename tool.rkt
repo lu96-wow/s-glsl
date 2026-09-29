@@ -10,7 +10,7 @@
 ;;   → 启用 use-program → 查 uniform uniform-location → 删除 delete-*
 ;;
 ;; 约定：
-;;   - 编译失败自动抛异常，消息分四段（OpenGL 行列/美化、s表达式 行列/美化，见 gl-error.rkt）。
+;;   - 编译失败自动抛异常，消息分三段（OpenGL 日志 / 美化 GLSL + 报错行 / 源文件 + 对应源行，见 gl-error.rkt）。
 ;;   - 链接失败抛异常，带链接日志。
 ;;   - 每段管线可自定义：任何 GL 着色器阶段类型都可作为编译 type。
 ;;   - 本模块不重新导出 OpenGL 名字（gl-vertex-shader 等由调用方从
