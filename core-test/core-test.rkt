@@ -1,11 +1,11 @@
 #lang racket/base
 ;; ============================================================
 ;; GLSL 核心（Layer 0）测试：用 require 引入，不用 #lang
-;; 运行：racket racket-glsl/core-test.rkt
+;; 运行：racket racket-glsl/core-test/core-test.rkt
 ;; ============================================================
 (require rackunit
-         "core.rkt"
-         "pretty.rkt")
+         "../core/core.rkt"
+         "../core/pretty.rkt")
 
 ;; ---------- 原语断言 ----------
 (check-equal? (glsl-version 330 "core") "#version 330 core\n")

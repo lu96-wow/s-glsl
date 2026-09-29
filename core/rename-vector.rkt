@@ -14,8 +14,10 @@
 ;;   - 标量（float/int/uint/bool/double）直接就是 Racket 数，不重定义，避免遮蔽 Racket 内置。
 ;;   - struct：glsl-struct 把 GLSL 的 struct（具名字段）镜像到 CPU 侧，
 ;;     一并生成铺平 / stride / offset / size（供 VBO + glVertexAttribPointer 用）。
-;;   - double 系（dvec/dmat/double）与 float 系精度对称：pack / glsl-struct 全 float →
-;;     f32vector、全 double → f64vector，混合报错。
+;;   - 精度/类别对称：pack / glsl-struct 按字段类别决定结果——全 float → f32vector、
+;;     全 double → f64vector、全 int/ivec → s32vector、全 uint/uvec/bool/bvec → u32vector；
+;;     混合类别（如 vec3 + int）→ u8vector（按字节正确铺开）。只有 float 系与 double
+;;     系混用仍报错（沿用原约定）。
 ;;   - 精度是 GLSL 命名轴上的选择：vec→f32vector，dvec→f64vector。别名透明，
 ;;     结果是货真价实的 ffi/vector，随时可用 ffi/vector 的 API（本模块已 all-from-out 转发）。
 ;;   - 列主序约定：GLSL mat/dmat 与 ffi/vector 的列主序展开一致，直接转、不转置。
@@ -48,12 +50,13 @@
          ;; 拼装：把多个 vec/dvec（f32vector/f64vector）连成一个连续缓冲
          concat-vecs concat-vecs!
          concat-dvecs concat-dvecs!
-         ;; vec：n 个同型向量的缓冲（静态/动态顶点数据）
-         vec make-vec vec? vec-count vec-width vec-ref vec-set! vec->f32vector
+         ;; gl-vec：n 个同型向量的缓冲（静态/动态顶点数据）
+         gl-vec make-gl-vec gl-vec? gl-vec-count gl-vec-width gl-vec-ref gl-vec-set! gl-vec->f32vector
          ;; GLSL struct：具名字段，与 shader 的 (struct ...) 对齐
          glsl-struct
-         ;; 尺寸 / 步长帮助
-         glsl-size glsl-byte-size glsl-stride glsl-stride-bytes glsl-type-table)
+         ;; 尺寸 / 步长 / 类别帮助
+         glsl-size glsl-byte-size glsl-stride glsl-stride-bytes glsl-type-table
+         glsl-kind)
 
 ;; ---------- 输入检查 ----------
 
@@ -121,7 +124,7 @@
 ;; 例：(concat-vecs (vec2 -0.5 -0.5) (vec2 0.5 -0.5) (vec2 0.0 0.5))
 ;;     → (f32vector -0.5 -0.5 0.5 -0.5 0.0 0.5)
 ;; 只分配输出这一块，不经过 list/apply（无参数个数上限）。
-;; 注：同宽度的向量请优先用 vec（见下）；本函数主要留给"混合宽度"的交错数据。
+;; 注：同宽度的向量请优先用 gl-vec（见下）；本函数主要留给"混合宽度"的交错数据。
 (define (concat-vecs . vs)
   (define total (for/sum ([v vs]) (f32vector-length v)))
   (define out (make-f32vector total 0.0))
@@ -139,64 +142,68 @@
   (concat-dvecs! out vs)
   out)
 
-;; ---------- vec：n 个同型向量的缓冲 ----------
-
+;; ---------- gl-vec：n 个同型向量的缓冲 ----------
+;;
+;; 命名归属：gl-vec-* 是「我们封装层」自己的 CPU 缓冲类型，
+;; 不是 OpenGL 函数（OpenGL 映射一律是 gl-<动词> ↔ glXxx）。
+;; 用全名（gl-vec-ref 而不是 vec-ref）是为了不和 vref/vcount 这些
+;; “向量取用”短名产生缩写歧义。
+;;
 ;; 内部结构：一个 f32vector + 每个 vec 的宽度（分量数）。
 ;; 对应 GLSL 的 vec2[N]/vec3[N]（同宽度向量数组），是"动态数量顶点"的 CPU 形状。
-;; （结构名用 gl-vec，把 vec 留给公开构造器；#:transparent 便于打印调试）
-(struct gl-vec (data width) #:transparent)
+(struct gl-vec-buffer (data width) #:transparent)
 
-(define vec? gl-vec?)
-(define vec-width gl-vec-width)
+(define gl-vec? gl-vec-buffer?)
+(define gl-vec-width gl-vec-buffer-width)
 
-;; 静态构造：(vec (vec2 ...) (vec2 ...) ...) —— 若干同型 vec，宽度取第一个、校验其余。
+;; 静态构造：(gl-vec (vec2 ...) (vec2 ...) ...) —— 若干同型 vec，宽度取第一个、校验其余。
 ;; 个数 = 你列了几个 vec（不用手写 num）。
-(define (vec . vs)
+(define (gl-vec . vs)
   (unless (pair? vs)
-    (error 'vec "至少给一个 vec，如 (vec (vec2 0.0 0.0))"))
+    (error 'gl-vec "至少给一个 vec，如 (gl-vec (vec2 0.0 0.0))"))
   (define w (f32vector-length (car vs)))
   (for ([v (cdr vs)])
     (unless (= (f32vector-length v) w)
-      (error 'vec "所有 vec 宽度须一致，实际 ~a 与 ~a" w (f32vector-length v))))
+      (error 'gl-vec "所有 vec 宽度须一致，实际 ~a 与 ~a" w (f32vector-length v))))
   (define data (make-f32vector (* w (length vs)) 0.0))
   (concat-vecs! data vs)
-  (gl-vec data w))
+  (gl-vec-buffer data w))
 
-;; 动态构造：(make-vec 1000 (vec3 0.0 0.0 0.0)) —— 预分配 n 个同型 vec（都填 template）。
-;; 之后用 vec-set! 逐帧原地覆写，零分配。
-(define (make-vec n template)
+;; 动态构造：(make-gl-vec 1000 (vec3 0.0 0.0 0.0)) —— 预分配 n 个同型 vec（都填 template）。
+;; 之后用 gl-vec-set! 逐帧原地覆写，零分配。
+(define (make-gl-vec n template)
   (unless (and (exact? n) (integer? n) (>= n 0))
-    (error 'make-vec "n 应为非负整数，实际 ~s" n))
+    (error 'make-gl-vec "n 应为非负整数，实际 ~s" n))
   (define w (f32vector-length template))
   (define data (make-f32vector (* n w) 0.0))
   (for ([i (in-range n)])
     (for ([j (in-range w)])
       (f32vector-set! data (+ (* i w) j) (f32vector-ref template j))))
-  (gl-vec data w))
+  (gl-vec-buffer data w))
 
 ;; 有多少个 vec
-(define (vec-count v) (quotient (f32vector-length (gl-vec-data v)) (gl-vec-width v)))
+(define (gl-vec-count v) (quotient (f32vector-length (gl-vec-buffer-data v)) (gl-vec-buffer-width v)))
 
 ;; 函数式读：返回第 i 个 vec（一个新 f32vector，宽度个分量）
-(define (vec-ref v i)
-  (define w (gl-vec-width v))
-  (define data (gl-vec-data v))
+(define (gl-vec-ref v i)
+  (define w (gl-vec-buffer-width v))
+  (define data (gl-vec-buffer-data v))
   (define out (make-f32vector w 0.0))
   (for ([j (in-range w)])
     (f32vector-set! out j (f32vector-ref data (+ (* i w) j))))
   out)
 
 ;; set! 式写：把第 i 个 vec 原地覆写为 w（零分配；w 须同宽）
-(define (vec-set! v i w)
-  (define width (gl-vec-width v))
+(define (gl-vec-set! v i w)
+  (define width (gl-vec-buffer-width v))
   (unless (= (f32vector-length w) width)
-    (error 'vec-set! "宽度不匹配：期望 ~a，实际 ~a" width (f32vector-length w)))
-  (define data (gl-vec-data v))
+    (error 'gl-vec-set! "宽度不匹配：期望 ~a，实际 ~a" width (f32vector-length w)))
+  (define data (gl-vec-buffer-data v))
   (for ([j (in-range width)])
     (f32vector-set! data (+ (* i width) j) (f32vector-ref w j))))
 
 ;; 上传：底层 f32vector（零拷贝）
-(define (vec->f32vector v) (gl-vec-data v))
+(define (gl-vec->f32vector v) (gl-vec-buffer-data v))
 
 ;; ---------- 矩阵（通用分派） ----------
 
@@ -281,13 +288,56 @@
 ;; 精度判断：double 族（double/dvec*/dmat*）→ f64；float 族 → f32。
 ;; 一处定义、三处用：glsl-component-bytes / pack / glsl-struct（宏在编译期，
 ;; 用下面同名的 define-for-syntax 常量）。
-(define-for-syntax double-family '(double dvec2 dvec3 dvec4 dmat2 dmat3 dmat4))
+;; 存储类别（宏展开期用；与运行期 glsl-kind 保持一致）
+(define-for-syntax (kind-of-type t)
+  (case t
+    [(float vec2 vec3 vec4 mat2 mat3 mat4) 'f32]
+    [(double dvec2 dvec3 dvec4 dmat2 dmat3 dmat4) 'f64]
+    [(int ivec2 ivec3 ivec4) 's32]
+    [(uint uvec2 uvec3 uvec4 bool bvec2 bvec3 bvec4) 'u32]
+    [else (error 'glsl-struct "未知 GLSL 类型（或无 CPU 表示）：~s" t)]))
+
 (define double-family '(double dvec2 dvec3 dvec4 dmat2 dmat3 dmat4))
 (define (double-type? t) (and (memq t double-family) #t))
 
 ;; 每个分量占几字节：float/int/uint/bool 系 = 4；double 系 = 8
 (define (glsl-component-bytes t)
   (if (double-type? t) 8 4))
+
+;; ---------- 存储类别 ----------
+;; 每个有 CPU 表示的 GLSL 类型归到一个“存储类别”，决定字节怎么写、打包成哪种向量：
+;;   f32 → float/vec*/mat*        （f32vector）
+;;   f64 → double/dvec*/dmat*     （f64vector）
+;;   s32 → int/ivec*              （s32vector）
+;;   u32 → uint/uvec*/bool/bvec*  （u32vector；GLSL bool 在内存是 32 位 0/1）
+(define (glsl-kind t)
+  (case t
+    [(float vec2 vec3 vec4 mat2 mat3 mat4) 'f32]
+    [(double dvec2 dvec3 dvec4 dmat2 dmat3 dmat4) 'f64]
+    [(int ivec2 ivec3 ivec4) 's32]
+    [(uint uvec2 uvec3 uvec4 bool bvec2 bvec3 bvec4) 'u32]
+    [else (error 'glsl-kind "未知 GLSL 类型（或无 CPU 表示）：~s" t)]))
+
+;; 类别 → 分量字节数 / 向量谓词 / 长度 / 读 / 构造器 / 名字
+(define (kind-component-bytes k) (if (eq? k 'f64) 8 4))
+(define (kind-vector? k)
+  (case k [(f32) f32vector?] [(f64) f64vector?] [(s32) s32vector?] [(u32) u32vector?]))
+(define (kind-length k)
+  (case k [(f32) f32vector-length] [(f64) f64vector-length] [(s32) s32vector-length] [(u32) u32vector-length]))
+(define (kind-ref k)
+  (case k [(f32) f32vector-ref] [(f64) f64vector-ref] [(s32) s32vector-ref] [(u32) u32vector-ref]))
+(define (kind-ctor k)
+  (case k [(f32) f32vector] [(f64) f64vector] [(s32) s32vector] [(u32) u32vector]))
+(define (kind->name k)
+  (case k [(f32) "f32vector"] [(f64) "f64vector"] [(s32) "s32vector"] [(u32) "u32vector"]))
+
+;; 分量 → 本机字节序的字节串（GL 直接吃本机字节序）
+(define (component->bytes kind x)
+  (case kind
+    [(f32) (real->floating-point-bytes x 4 (system-big-endian?))]
+    [(f64) (real->floating-point-bytes x 8 (system-big-endian?))]
+    [(s32) (integer->integer-bytes x 4 #t (system-big-endian?))]
+    [(u32) (integer->integer-bytes x 4 #f (system-big-endian?))]))
 
 ;; 元素数 × 分量字节数
 (define (glsl-byte-size t) (* (glsl-size t) (glsl-component-bytes t)))
@@ -304,32 +354,65 @@
 (define (glsl-stride-bytes . types)
   (apply + (map glsl-byte-size types)))
 
+;; 一个字段值 → 分量列表（长度 = glsl-size t），同时做类型/长度检查。
+(define (field->components who t f)
+  (define kind (glsl-kind t))
+  (define n (glsl-size t))
+  (define (scalar x)
+    (case kind
+      [(f32 f64) (check-float who x)]
+      [(s32)     (check-int who x)]
+      [(u32)     (if (eq? t 'bool)
+                     (->bool x)                      ; bool：收 #t/#f/数字
+                     (begin (check-int who x)
+                            (when (negative? x)
+                              (error who "uint 分量不能为负：~s" x))
+                            x))]))
+  (cond
+    [(= n 1) (list (scalar f))]
+    [else
+     (define v? (kind-vector? kind))
+     (unless (v? f)
+       (error who "字段 ~s 应为长度 ~a 的 ~a，实际 ~s" t n (kind->name kind) f))
+     (define len (kind-length kind))
+     (unless (= (len f) n)
+       (error who "字段 ~s 应为长度 ~a 的 ~a，实际长度 ~a" t n (kind->name kind) (len f)))
+     (define ref (kind-ref kind))
+     (for/list ([j (in-range n)]) (ref f j))]))
+
 ;; 低层原语：按类型清单把字段值铺成一条交错的记录（标量字段直接给数）。
 ;; 一般不要直接用——用 glsl-struct（具名字段）表达交错记录，它内部调 pack。
-;; 精度对称：字段类型全 float → f32vector；全 double → f64vector；混用 → 报错。
+;;
+;; 结果类型由各字段的存储类别决定：
+;;   全 f32                         → f32vector
+;;   全 f64                         → f64vector
+;;   全 s32（int/ivec*）            → s32vector
+;;   全 u32（uint/uvec*/bool/bvec*）→ u32vector
+;;   混合类别（如 vec3 + int）      → u8vector（按字节正确铺开）
+;;   float 系与 double 系混用       → 报错（沿用原约定）
 (define (pack types . fields)
   (unless (= (length types) (length fields))
     (error 'pack "字段数与类型清单不一致：~a 个字段 vs ~a 个类型" (length fields) (length types)))
-  (define all-double? (andmap double-type? types))
-  (define any-double? (ormap double-type? types))
-  (when (and any-double? (not all-double?))
+  (when (null? types) (error 'pack "至少要一个字段"))
+  (define kinds (map glsl-kind types))
+  (when (and (memq 'f32 kinds) (memq 'f64 kinds))
     (error 'pack "交错缓冲不能混用 float/double 精度：~s" types))
-  ;; 按精度选一套"向量原语"：标量构造 / 向量谓词 / 向量长度 / 拼接
-  (define-values (one vec? vlen concat)
-    (if all-double?
-        (values f64vector f64vector? f64vector-length concat-dvecs)
-        (values f32vector f32vector? f32vector-length concat-vecs)))
-  (apply concat
-         (for/list ([t (in-list types)] [f (in-list fields)])
-           (define n (glsl-size t))
-           (cond
-             [(= n 1) (one (check-float 'pack f))]
-             [(vec? f)
-              (unless (= (vlen f) n)
-                (error 'pack "字段 ~s 应为长度 ~a 的向量，实际 ~a" t n (vlen f)))
-              f]
-             [else (error 'pack "字段 ~s 应为标量（flonum）或 ~a 向量，实际 ~s"
-                          t (if all-double? "f64" "f32") f)]))))
+  (define comps (for/list ([t (in-list types)] [f (in-list fields)])
+                  (field->components 'pack t f)))
+  (cond
+    [(andmap (lambda (k) (eq? k (car kinds))) kinds)
+     (apply (kind-ctor (car kinds)) (apply append comps))]
+    [else
+     ;; 混合类别 → u8vector：逐字段按类别写正确字节
+     (define out (make-u8vector (apply + (map glsl-byte-size types)) 0))
+     (for/fold ([off 0]) ([t (in-list types)] [cs (in-list comps)])
+       (define kind (glsl-kind t))
+       (define bs (kind-component-bytes kind))
+       (for ([x (in-list cs)] [j (in-naturals)])
+         (for ([b (in-bytes (component->bytes kind x))] [k (in-naturals)])
+           (u8vector-set! out (+ off (* j bs) k) b)))
+       (+ off (* (length cs) bs)))
+     out]))
 
 ;; 低层原语：交错布局里每个字段的字节偏移（glsl-struct 内部用）：
 ;;   (glsl-field-offsets '(vec3 vec3 float)) → '(0 12 24)
@@ -345,7 +428,8 @@
 ;;   (glsl-struct instance (vec3 offset) (vec3 color) (float phase))
 ;; 生成：
 ;;   - Racket struct：instance（构造器，与 GLSL 的 struct 构造器同名）/ instance? / instance-offset / ...
-;;   - (instance->f32vector rec)  铺平成交错 f32vector（喂 VBO）；字段全 double 时生成 ->f64vector
+;;   - (instance->f32vector rec)  铺平成交错向量（喂 VBO）；按字段类别自动取
+;;     ->f32vector / ->f64vector / ->s32vector / ->u32vector，混合类别时生成 ->bytes（u8vector）
 ;;   - (instance-stride)          总字节步长
 ;;   - (instance-field-offset 'x) 字段字节偏移（给 glVertexAttribPointer）
 ;;   - (instance-field-size   'x) 字段分量数（给 glVertexAttribPointer 的 size）
@@ -357,15 +441,21 @@
     [(_ Name (type field) ...)
      (let* ([types     (syntax->list #'(type ...))]
             [fields    (syntax->list #'(field ...))]
-            [type-syms (map syntax->datum types)]
-            [double?   (lambda (t) (memq t double-family))]
-            [all-double? (andmap double? type-syms)]
-            [any-double? (ormap double? type-syms)])
+            [type-syms (map syntax->datum types)])
        (when (null? fields)
          (error 'glsl-struct "至少需要一个字段"))
-       (when (and any-double? (not all-double?))
+       (define kinds (map kind-of-type type-syms))
+       (when (and (memq 'f32 kinds) (memq 'f64 kinds))
          (error 'glsl-struct "字段不能混用 float/double 精度：~s" type-syms))
-       (define pack-fmt (if all-double? "~a->f64vector" "~a->f32vector"))
+       (define all-same? (andmap (lambda (k) (eq? k (car kinds))) kinds))
+       (define pack-fmt
+         (if all-same?
+             (case (car kinds)
+               [(f32) "~a->f32vector"]
+               [(f64) "~a->f64vector"]
+               [(s32) "~a->s32vector"]
+               [(u32) "~a->u32vector"])
+             "~a->bytes"))
        (with-syntax
          ([types-list   (datum->syntax #'Name type-syms)]
           [to-vec       (format-id #'Name pack-fmt #'Name)]

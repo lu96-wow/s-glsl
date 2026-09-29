@@ -1,13 +1,16 @@
 #lang racket/base
-;; 运行：racket racket-glsl/rename-vector-test.rkt
+;; 运行：racket racket-glsl/core-test/rename-vector-test.rkt
 (require rackunit
-         "rename-vector.rkt")
+         "../core/rename-vector.rkt")
 
 ;; ffi vector 的 equal? 不比较内容，统一用 ->list 比
 (define (lv v) (f32vector->list v))
 (define (ld v) (f64vector->list v))
 (define (li v) (s32vector->list v))
 (define (lu v) (u32vector->list v))
+;; u8vector 的一段 → bytes（用于按字节解码验证）
+(define (bv->bytes bv start len)
+  (apply bytes (for/list ([i (in-range start (+ start len))]) (u8vector-ref bv i))))
 
 ;; ---------- 向量构造 + 显式输入检查 ----------
 (check-equal? (lv (vec3 1.0 2.0 3.0)) '(1.0 2.0 3.0))
@@ -35,28 +38,28 @@
 (check-equal? (concat-vecs! dst (list (vec2 1.0 2.0) (vec3 3.0 4.0 5.0))) 5)
 (check-equal? (lv dst) '(1.0 2.0 3.0 4.0 5.0 0.0 0.0 0.0 0.0 0.0))
 
-;; ---------- vec：n 个同型向量 ----------
+;; ---------- gl-vec：n 个同型向量 ----------
 ;; 静态构造 + 访问
-(define vn (vec (vec2 -0.5 -0.5) (vec2 0.5 -0.5) (vec2 0.0 0.5)))
-(check-true (vec? vn))
-(check-equal? (vec-count vn) 3)
-(check-equal? (vec-width vn) 2)
-(check-equal? (lv (vec->f32vector vn)) '(-0.5 -0.5 0.5 -0.5 0.0 0.5))
-(check-equal? (lv (vec-ref vn 1)) '(0.5 -0.5))        ; 函数式读：新切片
+(define vn (gl-vec (vec2 -0.5 -0.5) (vec2 0.5 -0.5) (vec2 0.0 0.5)))
+(check-true (gl-vec? vn))
+(check-equal? (gl-vec-count vn) 3)
+(check-equal? (gl-vec-width vn) 2)
+(check-equal? (lv (gl-vec->f32vector vn)) '(-0.5 -0.5 0.5 -0.5 0.0 0.5))
+(check-equal? (lv (gl-vec-ref vn 1)) '(0.5 -0.5))        ; 函数式读：新切片
 ;; set! 式写（原地，零分配）
-(vec-set! vn 1 (vec2 9.0 9.0))
-(check-equal? (lv (vec->f32vector vn)) '(-0.5 -0.5 9.0 9.0 0.0 0.5))
+(gl-vec-set! vn 1 (vec2 9.0 9.0))
+(check-equal? (lv (gl-vec->f32vector vn)) '(-0.5 -0.5 9.0 9.0 0.0 0.5))
 ;; 动态构造：预分配 n 个，填 template
-(define dn (make-vec 1000 (vec3 0.0 0.0 0.0)))
-(check-equal? (vec-count dn) 1000)
-(check-equal? (vec-width dn) 3)
-(check-equal? (lv (vec-ref dn 999)) '(0.0 0.0 0.0))
-(vec-set! dn 0 (vec3 1.0 2.0 3.0))
-(check-equal? (lv (vec-ref dn 0)) '(1.0 2.0 3.0))
+(define dn (make-gl-vec 1000 (vec3 0.0 0.0 0.0)))
+(check-equal? (gl-vec-count dn) 1000)
+(check-equal? (gl-vec-width dn) 3)
+(check-equal? (lv (gl-vec-ref dn 999)) '(0.0 0.0 0.0))
+(gl-vec-set! dn 0 (vec3 1.0 2.0 3.0))
+(check-equal? (lv (gl-vec-ref dn 0)) '(1.0 2.0 3.0))
 ;; 报错：空 / 宽度不一致 / set! 宽度不匹配
-(check-exn exn:fail? (lambda () (vec)))
-(check-exn exn:fail? (lambda () (vec (vec2 1.0 2.0) (vec3 1.0 2.0 3.0))))
-(check-exn exn:fail? (lambda () (vec-set! vn 0 (vec3 1.0 2.0 3.0))))
+(check-exn exn:fail? (lambda () (gl-vec)))
+(check-exn exn:fail? (lambda () (gl-vec (vec2 1.0 2.0) (vec3 1.0 2.0 3.0))))
+(check-exn exn:fail? (lambda () (gl-vec-set! vn 0 (vec3 1.0 2.0 3.0))))
 
 ;; ---------- mat：对角 ----------
 (check-equal? (lv (mat2 1.0)) '(1.0 0.0 0.0 1.0))
@@ -173,5 +176,43 @@
 
 ;; 混用 float/double 字段 → 宏展开时报错（不是运行时报错）
 (check-exn exn:fail? (lambda () (eval '(glsl-struct mixed-vertex (vec3 a) (dvec3 b)))))
+
+;; ---------- glsl-struct：整数 / 布尔字段（修复：以前会报错或写错字节）----------
+;; 全 int → s32vector
+(glsl-struct irec (ivec3 a) (int b))
+(check-true (s32vector? (irec->s32vector (irec (ivec3 1 2 3) 7))))
+(check-equal? (li (irec->s32vector (irec (ivec3 1 2 3) 7))) '(1 2 3 7))
+(check-equal? (irec-stride) 16)
+(check-equal? (irec-field-offset 'b) 12)
+
+;; 全 uint/uvec → u32vector
+(glsl-struct urec (uvec3 a) (uint b))
+(check-equal? (lu (urec->u32vector (urec (uvec3 1 2 3) 9))) '(1 2 3 9))
+
+;; bool 标量 → u32（0/1）
+(glsl-struct brec (bvec3 a) (bool b))
+(check-equal? (lu (brec->u32vector (brec (bvec3 #t #f #t) #t))) '(1 0 1 1))
+
+;; 混合类别（float + int）→ u8vector；int 字段必须是整数字节，不是 float 字节
+(glsl-struct mrec (vec3 pos) (int idx))
+(define mrec-bytes (mrec->bytes (mrec (vec3 1.0 2.0 3.0) 7)))
+(check-true (u8vector? mrec-bytes))
+(check-equal? (u8vector-length mrec-bytes) 16)
+(check-equal? (floating-point-bytes->real (bv->bytes mrec-bytes 0 4) (system-big-endian?)) 1.0)
+(check-equal? (floating-point-bytes->real (bv->bytes mrec-bytes 8 4) (system-big-endian?)) 3.0)
+(check-equal? (integer-bytes->integer (bv->bytes mrec-bytes 12 4) #t (system-big-endian?)) 7)
+(check-equal? (mrec-field-offset 'idx) 12)
+(check-equal? (mrec-field-size 'idx) 1)
+(check-equal? (mrec-stride) 16)
+
+;; double + int 也是混合 → u8vector，int 部分仍是整数字节
+(glsl-struct dmrec (dvec3 pos) (int idx))
+(define dmrec-bytes (dmrec->bytes (dmrec (dvec3 1.0 2.0 3.0) 5)))
+(check-true (u8vector? dmrec-bytes))
+(check-equal? (integer-bytes->integer (bv->bytes dmrec-bytes 24 4) #t (system-big-endian?)) 5)
+
+;; 整数字段的坏输入仍要报错
+(check-exn exn:fail? (lambda () (mrec->bytes (mrec (vec3 1.0 2.0 3.0) 7.5))))  ; int 字段给非整数
+(check-exn exn:fail? (lambda () (urec->u32vector (urec (uvec3 1 2 3) -1))))     ; uint 给负数
 
 (displayln "rename-vector 全部测试通过")

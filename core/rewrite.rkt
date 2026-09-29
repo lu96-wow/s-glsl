@@ -551,7 +551,7 @@
                 (error 'glsl "glsl-unquote：不支持点对语法 ~s" d))]
            [else d]))
        (define datas (map walk forms))            ; 带标记的 datum 树
-       (define splice-vec (list->vector (reverse splices)))
+       (define splice-gl-vec (list->vector (reverse splices)))
 
        ;; 先收集本块 struct 名，扩充类型集合
        (type-names builtin-types)
@@ -574,7 +574,7 @@
        ;; splice-marker 换成使用侧语法（Racket 表达式原样求值，须返回字符串/glsl-program）。
        (define (tree->syntax t)
          (cond
-           [(splice-marker? t) (vector-ref splice-vec (splice-marker-index t))]
+           [(splice-marker? t) (vector-ref splice-gl-vec (splice-marker-index t))]
            [(pair? t) (cons (tree->syntax (car t)) (tree->syntax (cdr t)))]
            [else (datum->syntax #'make-glsl-program t)]))
 

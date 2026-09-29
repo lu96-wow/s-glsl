@@ -1,11 +1,11 @@
 #lang racket/base
 ;; ============================================================
 ;; 边界情况测试：行级源映射 + glsl-unquote 拼接 + gl-error 渲染
-;; 运行：racket racket-glsl/edge-test.rkt
+;; 运行：racket racket-glsl/core-test/edge-test.rkt
 ;; ============================================================
 (require rackunit racket/string
-         "gl-error.rkt"
-         "rewrite.rkt")
+         "../core/gl-error.rkt"
+         "../core/rewrite.rkt")
 
 ;; ---------- 小工具 ----------
 

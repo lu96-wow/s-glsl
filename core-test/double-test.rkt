@@ -1,16 +1,16 @@
 #lang racket/base
 ;; ============================================================
 ;; double-test.rkt —— double 精度端到端冒烟测试
-;; 运行：racket racket-glsl/double-test.rkt   （需要显示器 + GL 4.0+）
+;; 运行：racket racket-glsl/core-test/double-test.rkt   （需要显示器 + GL 4.0+）
 ;; 验证：dvec 顶点属性（gl-vertex-attrib-l-pointer）+ double uniform
 ;;       （gl-uniform-1d）+ f64vector VBO 上传（gl-buffer-data）全链路。
 ;; 通过 = 打印 "double upload ok" 并 exit 0；失败 = 抛异常。
 ;; ============================================================
 (require racket/gui
-         "opengl-rename.rkt"     ; gl-* 命名层（含 double 函数）
-         "rewrite.rkt"           ; (glsl ...) 宏
-         "rename-vector.rkt"     ; dvec*/concat-dvecs/glsl-stride-bytes
-         "tool.rkt")             ; build-program / uniform-location
+         "../core/opengl-rename.rkt"     ; gl-* 命名层（含 double 函数）
+         "../core/rewrite.rkt"           ; (glsl ...) 宏
+         "../core/rename-vector.rkt"     ; dvec*/concat-dvecs/glsl-stride-bytes
+         "../core/program.rkt")             ; build-program / uniform-location
 
 ;; 一个离屏 GL 上下文（不必 show 窗口；with-gl-context 会按需创建上下文）
 (define cfg (new gl-config%))

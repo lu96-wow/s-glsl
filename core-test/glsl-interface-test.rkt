@@ -1,11 +1,11 @@
 #lang racket/base
 ;; ============================================================
 ;; glsl-interface 测试：GLSL 类型模型 + 一个 shader 的接口反射
-;; 运行：racket racket-glsl/glsl-interface-test.rkt
+;; 运行：racket racket-glsl/core-test/glsl-interface-test.rkt
 ;; ============================================================
 (require rackunit racket/list
-         "glsl-interface.rkt"
-         "rewrite.rkt")
+         "../core/glsl-interface.rkt"
+         "../core/rewrite.rkt")
 
 ;; ---------- ① 类型模型：内建类型 ----------
 (define (bt s) (builtin-glsl-type s))

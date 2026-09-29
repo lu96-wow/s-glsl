@@ -67,6 +67,7 @@
 (define gl-delete-shader              glDeleteShader)
 (define gl-delete-textures            glDeleteTextures)
 (define gl-depth-mask                 glDepthMask)
+(define gl-detach-shader              glDetachShader)
 (define gl-disable                    glDisable)
 (define gl-draw-arrays                glDrawArrays)
 (define gl-draw-elements              glDrawElements)
