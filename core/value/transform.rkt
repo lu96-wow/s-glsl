@@ -8,7 +8,7 @@
 ;; GLSL 名（mat4-look-at / …）在 rename-transform.rkt。
 ;; ============================================================
 
-(require ffi/vector "vec.rkt")
+(require ffi/vector "access.rkt" "vec.rkt")
 
 (provide translation-matrix rotation-x-matrix rotation-y-matrix rotation-z-matrix
          scaling-matrix ortho-matrix perspective-matrix look-at-matrix)

@@ -3,6 +3,7 @@
 (require rackunit
          ffi/vector
          "../core/value/rename-type.rkt"
+         "../core/value/rename-access.rkt"
          "../core/value/rename-construct.rkt"
          "../core/value/rename-layout.rkt"
          "../core/value/rename-buffer.rkt"

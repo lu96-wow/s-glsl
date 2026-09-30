@@ -4,7 +4,7 @@
 ;; 值层 · value/rename-matrix.rkt —— GLSL 风格命名（矩阵运算）
 ;;
 ;; 纯 alias：value/matrix.rkt 的 Racket 名 → GLSL 名。零逻辑。
-;; 唯一动作：GLSL 的 mat4-ref m col row ↔ Racket 的 matrix-ref m row col（交换参数）。
+;; 元素取用的别名（mat4-ref / mat4-set!）在 rename-access.rkt。
 ;; ============================================================
 
 (require "matrix.rkt" (for-syntax racket/base racket/syntax))
@@ -14,9 +14,7 @@
 (define-syntax (define-matrix-glsl-names stx)
   (syntax-case stx ()
     [(_ prefix n kind)
-     (with-syntax ([ref       (format-id #'prefix "~a-ref" #'prefix)]
-                   [setv      (format-id #'prefix "~a-set!" #'prefix)]
-                   [ident     (format-id #'prefix "~a-identity" #'prefix)]
+     (with-syntax ([ident     (format-id #'prefix "~a-identity" #'prefix)]
                    [copy      (format-id #'prefix "~a-copy" #'prefix)]
                    [mul       (format-id #'prefix "~a-mul" #'prefix)]
                    [mulvec    (format-id #'prefix "~a-mul-vec" #'prefix)]
@@ -28,8 +26,6 @@
                    [inv       (format-id #'prefix "~a-inverse" #'prefix)]
                    [muls      (format-id #'prefix "~a-mul-scalar" #'prefix)])
        #'(begin
-           (define (ref m col row) (matrix-ref m row col))
-           (define (setv m col row x) (matrix-set! m row col x))
            (define (ident) (identity-matrix n 'kind))
            (define (copy m) (matrix-copy m))
            (define (mul a b) (matrix* a b))

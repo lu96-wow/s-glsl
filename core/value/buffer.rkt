@@ -1,9 +1,9 @@
 #lang racket/base
 
 ;; ============================================================
-;; 值层 · value/buffer.rkt —— 拼接 + 顶点缓冲
+;; 值层 · value/buffer.rkt —— 缓冲类型 + 构造 + 拼接
 ;;
-;; 「逻辑：把若干 cvector 拼成连续缓冲 / n 个同型向量的 CPU 形状」。
+;; 「逻辑：vec-buffer 这种数据类型（n 个同型向量）+ 拼接」。元素取用在 access.rkt。
 ;; 不调用任何 GL（纯 CPU 数据），命名：[Racket 传统]。
 ;; GLSL 名（gl-vec/… 、concat-vecs）在 rename-buffer.rkt。
 ;; ============================================================
@@ -12,8 +12,7 @@
 
 (provide concat-vectors concat-vectors! concat-dvectors concat-dvectors!
          vec-buffer vec-buffer? vec-buffer-width vec-buffer-data
-         vec-buffer-from make-vec-buffer
-         vec-buffer-count vec-buffer-ref vec-buffer-set!)
+         vec-buffer-from make-vec-buffer)
 
 ;; ---------- 拼接 ----------
 
@@ -64,21 +63,3 @@
     (for ([j (in-range w)])
       (f32vector-set! data (+ (* i w) j) (f32vector-ref template j))))
   (vec-buffer data w))
-
-(define (vec-buffer-count v) (quotient (f32vector-length (vec-buffer-data v)) (vec-buffer-width v)))
-
-(define (vec-buffer-ref v i)
-  (define w (vec-buffer-width v))
-  (define data (vec-buffer-data v))
-  (define out (make-f32vector w 0.0))
-  (for ([j (in-range w)])
-    (f32vector-set! out j (f32vector-ref data (+ (* i w) j))))
-  out)
-
-(define (vec-buffer-set! v i w)
-  (define width (vec-buffer-width v))
-  (unless (= (f32vector-length w) width)
-    (error 'vec-buffer-set! "宽度不匹配：期望 ~a，实际 ~a" width (f32vector-length w)))
-  (define data (vec-buffer-data v))
-  (for ([j (in-range width)])
-    (f32vector-set! data (+ (* i width) j) (f32vector-ref w j))))

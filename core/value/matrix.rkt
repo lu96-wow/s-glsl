@@ -3,40 +3,23 @@
 ;; ============================================================
 ;; 值层 · value/matrix.rkt —— 矩阵运算
 ;;
-;; 「逻辑：GLSL 矩阵内建的 CPU 镜像（列主序）」。阶 n = sqrt(长度)，自动推出。
+;; 「逻辑：GLSL 矩阵内建的 CPU 镜像（运算部分；元素取用在 access.rkt）」
 ;; 约定：matrix-ref m row col（Racket 约定），内部列主序 m[col][row] = idx col*n+row。
 ;; 命名：[Racket 传统]（matrix-ref / matrix* / …）。GLSL 名（mat4-ref/mat4-mul/…）
 ;; 在 rename-matrix.rkt（在那里交换 col/row）。
 ;; ============================================================
 
-(require ffi/vector "type.rkt" "cvector.rkt")
+(require ffi/vector "type.rkt" "cvector.rkt" "access.rkt")
 
-(provide matrix-ref matrix-set! identity-matrix matrix-copy matrix*
+(provide identity-matrix matrix-copy matrix*
          matrix-vector* vector-matrix* matrix+ matrix- matrix-neg
          matrix-transpose matrix-inverse matrix-scale)
-
-(define (matrix-dim who m)
-  (define len ((kind-length (value-kind m who)) m))
-  (define n (integer-sqrt len))
-  (unless (= (* n n) len) (error who "不是方阵：长度 ~a 不是平方数" len))
-  n)
 
 (define (check-matrix who k n m)
   (define k2 (value-kind m who))
   (unless (eq? k k2) (error who "矩阵精度不匹配：~a vs ~a" k k2))
   (unless (= n (matrix-dim who m)) (error who "矩阵阶不匹配"))
   m)
-
-;; Racket 约定：第 row 行、第 col 列。存储列主序 → idx = col*n + row。
-(define (matrix-ref m row col)
-  (define k (value-kind m 'matrix-ref))
-  (define n (matrix-dim 'matrix-ref m))
-  ((kind-ref k) m (+ (* col n) row)))
-
-(define (matrix-set! m row col x)
-  (define k (value-kind m 'matrix-set!))
-  (define n (matrix-dim 'matrix-set! m))
-  ((kind-set! k) m (+ (* col n) row) x))
 
 (define (identity-matrix n k)
   (apply (kind-ctor k) (for*/list ([c (in-range n)] [r (in-range n)]) (if (= c r) 1.0 0.0))))

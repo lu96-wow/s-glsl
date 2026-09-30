@@ -8,20 +8,13 @@
 
 (require "vec.rkt")
 
-(provide vcount vref vset! vx vy vz vw vmap
+(provide vmap
          vadd vsub vmul vdiv vneg vabs vmin vmax vfloor vceil vfract vmod
          vsqrt vpow vexp vlog vsin vcos vtan vradians vdegrees
          vdot vcross vlength vdistance vnormalize vmix vclamp
          vstep vsmoothstep vreflect vrefract vfaceforward
          vand vor vxor vnot vshl vshr)
 
-(define vcount vec-count)
-(define vref vec-ref)
-(define vset! vec-set!)
-(define vx vec-x)
-(define vy vec-y)
-(define vz vec-z)
-(define vw vec-w)
 (define vmap vec-map)
 
 (define vadd vec-add)

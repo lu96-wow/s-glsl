@@ -43,6 +43,7 @@
 | 逻辑 | 实现（Racket 名） | rename（GLSL 名） |
 |---|---|---|
 | 类型与存储 | `core/value/type.rkt` | `rename-type.rkt`：`glsl-size`、`glsl-kind`、`glsl-byte-size` |
+| 取用（索引读写） | `core/value/access.rkt` | `rename-access.rkt`：`vcount`、`vref`、`mat4-ref`、`gl-vec-ref` |
 | 构造 | `core/value/construct.rkt` | `rename-construct.rkt`：`vec3`、`mat4`、`dvec3` |
 | 交错布局 | `core/value/layout.rkt` | `rename-layout.rkt`：`glsl-struct` |
 | 缓冲 / 拼接 | `core/value/buffer.rkt` | `rename-buffer.rkt`：`gl-vec`、`concat-vecs` |

@@ -3,7 +3,7 @@
 ;; ============================================================
 ;; 值层 · value/vec.rkt —— 向量运算
 ;;
-;; 「逻辑：GLSL 向量内建的 CPU 镜像」。
+;; 「逻辑：GLSL 向量内建的 CPU 镜像（运算部分；取用在 access.rkt）」。
 ;; 数据面是裸 ffi cvector；宽度 = cvector 长度（自动）；标量可放任一侧。
 ;; 命名：[Racket 传统]（vec-add / vec-dot / …）。GLSL 名（vadd/vdot/…）在 rename-vec.rkt。
 ;; ============================================================
@@ -11,24 +11,13 @@
 (require ffi/vector "type.rkt" "cvector.rkt")
 
 (provide
- vec-count vec-ref vec-set! vec-x vec-y vec-z vec-w vec-map
+ vec-map
  vec-add vec-sub vec-mul vec-div vec-neg vec-abs vec-min vec-max
  vec-floor vec-ceil vec-fract vec-mod
  vec-sqrt vec-pow vec-exp vec-log vec-sin vec-cos vec-tan vec-radians vec-degrees
  vec-dot vec-cross vec-length vec-distance vec-normalize vec-mix vec-clamp
  vec-step vec-smoothstep vec-reflect vec-refract vec-faceforward
  vec-and vec-or vec-xor vec-not vec-shift-left vec-shift-right)
-
-;; ---------- 分量 / 形状 ----------
-
-(define (vec-count v) ((kind-length (value-kind v 'vec-count)) v))
-(define (vec-ref v i) ((kind-ref (value-kind v 'vec-ref)) v i))
-(define (vec-set! v i x) ((kind-set! (value-kind v 'vec-set!)) v i x))
-
-(define (vec-x v) (vec-ref v 0))
-(define (vec-y v) (vec-ref v 1))
-(define (vec-z v) (vec-ref v 2))
-(define (vec-w v) (vec-ref v 3))
 
 ;; 逐分量应用任意函数（逃生舱）。结果类型同输入。
 (define (vec-map f v) (cvector-map1 'vec-map f v))

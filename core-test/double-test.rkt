@@ -11,6 +11,7 @@
          "../core/opengl/rename.rkt"     ; gl-* 命名层（含 double 函数）
          "../core/glsl/rewrite.rkt"           ; (glsl ...) 宏
          "../core/value/rename-type.rkt"
+         "../core/value/rename-access.rkt"
          "../core/value/rename-construct.rkt"
          "../core/value/rename-layout.rkt"
          "../core/value/rename-buffer.rkt"

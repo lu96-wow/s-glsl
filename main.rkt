@@ -23,6 +23,7 @@
          "core/glsl/rewrite.rkt"
          ;; Part 2：(glsl) 外 —— Racket-ffi 重实现的 GLSL 风格命名
          "core/value/rename-type.rkt"
+         "core/value/rename-access.rkt"
          "core/value/rename-construct.rkt"
          "core/value/rename-layout.rkt"
          "core/value/rename-buffer.rkt"
@@ -41,6 +42,7 @@
          (all-from-out ffi/vector)
          (all-from-out "core/glsl/rewrite.rkt")
          (all-from-out "core/value/rename-type.rkt")
+         (all-from-out "core/value/rename-access.rkt")
          (all-from-out "core/value/rename-construct.rkt")
          (all-from-out "core/value/rename-layout.rkt")
          (all-from-out "core/value/rename-buffer.rkt")

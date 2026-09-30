@@ -46,6 +46,7 @@ A、B 谁都不 require 对方。
 | 逻辑 | 实现（Racket 名） | rename（GLSL 名） |
 |---|---|---|
 | 类型与存储 | `value/type.rkt` | `value/rename-type.rkt`：`glsl-size / glsl-kind / glsl-byte-size / glsl-stride-bytes` |
+| 取用（索引读写） | `value/access.rkt` | `value/rename-access.rkt`：`vcount/vref/vset!/vx…vw`、`mat4-ref/mat4-set!`、`gl-vec-count/ref/set!` |
 | 构造 | `value/construct.rkt` | `value/rename-construct.rkt`：`vec2…bvec4 / mat2…dmat4` |
 | 交错布局 | `value/layout.rkt` | `value/rename-layout.rkt`：`glsl-struct` |
 | 缓冲 / 拼接 | `value/buffer.rkt` | `value/rename-buffer.rkt`：`gl-vec / concat-vecs / …` |
@@ -59,10 +60,12 @@ A、B 谁都不 require 对方。
 依赖方向：
 
 ```
-value/cvector.rkt  ←  value/type.rkt, value/construct.rkt, value/layout.rkt,
-                      value/vec.rkt, value/matrix.rkt, value/convert.rkt
-value/transform.rkt  →  value/vec.rkt
-value/rename-*.rkt   →  只依赖对应的 value/<逻辑>.rkt（零逻辑）
+value/cvector.rkt  ←  value/type.rkt, value/access.rkt, value/construct.rkt,
+                      value/layout.rkt, value/vec.rkt, value/matrix.rkt, value/convert.rkt
+value/buffer.rkt   ←  value/access.rkt
+value/access.rkt   ←  value/matrix.rkt, value/transform.rkt
+value/vec.rkt      ←  value/transform.rkt
+value/rename-*.rkt →  只依赖对应的 value/<逻辑>.rkt（零逻辑）
 ```
 
 ## Part 3 · `core/opengl/` —— OpenGL → Racket 命名
@@ -91,7 +94,7 @@ value/rename-*.rkt   →  只依赖对应的 value/<逻辑>.rkt（零逻辑）
 ## `#lang glsl` 聚合（`main.rkt`）
 
 `main.rkt` require：Part 1 `glsl/rewrite.rkt`（重导 core/pretty/interface/program）、
-Part 2 的 7 个 `value/rename-*.rkt` + `value/convert.rkt`、Part 3 `opengl/rename.rkt`、
+Part 2 的 8 个 `value/rename-*.rkt` + `value/convert.rkt`、Part 3 `opengl/rename.rkt`、
 胶水 `tool/{compile,program,error}.rkt`、`ffi/vector`；
 provide 上述全部（GLSL 风格 API）。值层的 Racket 风格实现（`vec-add` / `matrix-ref` …）
 不在这里导出，需要时直接 require `value/<逻辑>.rkt`。
@@ -105,8 +108,8 @@ provide 上述全部（GLSL 风格 API）。值层的 Racket 风格实现（`vec
 | `core/glsl-interface.rkt` | `glsl/interface.rkt` |
 | `core/glsl-program.rkt` | `glsl/program.rkt` |
 | `core/rewrite.rkt` | `glsl/rewrite.rkt` |
-| `core/rename-vector.rkt` | `value/{type,construct,layout,buffer}.rkt` + `value/rename-{type,construct,layout,buffer}.rkt` |
-| `core/vec-math.rkt` | `value/{cvector,vec,matrix,convert}.rkt` + `value/rename-{vec,matrix}.rkt` |
+| `core/rename-vector.rkt` | `value/{type,construct,layout,buffer}.rkt` + `value/rename-{type,construct,layout,buffer}.rkt`（缓冲元素取用归 `access.rkt`） |
+| `core/vec-math.rkt` | `value/{cvector,access,vec,matrix,convert}.rkt` + `value/rename-{access,vec,matrix}.rkt` |
 | `core/transform.rkt` | `value/transform.rkt` + `value/rename-transform.rkt` |
 | `core/opengl-rename.rkt` | `opengl/rename.rkt` |
 | `core/tool.rkt` | `tool/compile.rkt` |

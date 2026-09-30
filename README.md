@@ -406,6 +406,7 @@ core/glsl/program.rkt     glsl-program 产物 + 源映射
 
 core/value/             Part 2：(glsl) 命名空间外 —— Racket-ffi 重实现（每逻辑一对）
 core/value/type.rkt       + rename-type.rkt      类型与存储
+core/value/access.rkt     + rename-access.rkt    取用：vcount/vref/vset!、mat4-ref/mat4-set!
 core/value/construct.rkt  + rename-construct.rkt 构造（vecN/matN）
 core/value/layout.rkt     + rename-layout.rkt    交错布局 / glsl-struct
 core/value/buffer.rkt     + rename-buffer.rkt    缓冲 / gl-vec / concat-vecs
