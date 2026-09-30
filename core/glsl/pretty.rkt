@@ -49,15 +49,18 @@
        (or (= (+ i wl) n)
            (not (ident-char? (string-ref s (+ i wl)))))))
 
-;; j 处是否形如 "名字;" / "名字["（接口块实例名，} 之后应保持同行）
+;; j 处是否形如 "名字;" / "名字["（接口块实例名，} 之后应保持同行）。
+;; 只认单个标识符（不跨空格），并排除语句关键字——否则 "} return x;" 会被误并成一行。
 (define (instance-name? s n j)
   (and (< j n)
        (ident-char? (string-ref s j))
        (let scan ([k j])
          (cond [(>= k n) #f]
                [(ident-char? (string-ref s k)) (scan (add1 k))]
-               [(char=? (string-ref s k) #\space) (scan (add1 k))]
-               [else (memv (string-ref s k) '(#\; #\[))]))))
+               [(memv (string-ref s k) '(#\; #\[))
+                (not (memq (string->symbol (substring s j k))
+                           '(return break continue discard)))]
+               [else #f]))))
 
 ;; j 处的 "while" 是 do-while 的收尾（} while (...);）还是独立 while 语句？
 ;; 依据：看 while (...) 的 ) 之后是 ;（do-while 收尾）还是 {（独立 while）。

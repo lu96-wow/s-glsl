@@ -318,13 +318,17 @@
   (define directive-keywords
     '(define-macro undef ifdef ifndef elif else endif error pragma extension))
 
-  ;; 是否为"表达式形态"（非控制流/声明/预处理指令）
+  ;; 是否为「表达式形态」：原子（符号/数字/布尔）也算表达式，
+  ;; 否则函数体以裸符号/数字结尾时自动 return 会失效（落到语句位置报错）。
   (define (expr-form? f)
-    (and (pair? f)
-         (let ([h (car f)])
-           (not (or (memq h stmt-keywords)
-                    (memq h directive-keywords)
-                    (declaration? f))))))
+    (cond
+      [(or (symbol? f) (number? f) (boolean? f)) #t]
+      [(pair? f)
+       (let ([h (car f)])
+         (not (or (memq h stmt-keywords)
+                  (memq h directive-keywords)
+                  (declaration? f))))]
+      [else #f]))
 
   (define (rw-param p)
     (define head (car p))
