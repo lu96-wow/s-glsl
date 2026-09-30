@@ -24,6 +24,10 @@
 (define deps '("base" "gui-lib" "rackunit-lib" "opengl"))
 (define build-deps '())
 
+;; core-test 只是本仓库的测试，不参与包编译 / `raco setup`（`raco test core-test` 仍可显式运行）。
+;; 若还想让包级 `raco test` 跳过它，再加一行：(define test-omit-paths '("core-test"))
+(define compile-omit-paths '("core-test"))
+
 (define pkg-desc "GLSL DSL for Racket: #lang glsl + core rewrite/pretty/interface/tool layers")
 (define pkg-authors '("lu96"))
 (define license '("MIT"))
