@@ -1,7 +1,12 @@
 #lang racket/base
 ;; 运行：racket racket-glsl/core-test/rename-vector-test.rkt
 (require rackunit
-         "../core/rename-vector.rkt")
+         ffi/vector
+         "../core/value/rename-type.rkt"
+         "../core/value/rename-construct.rkt"
+         "../core/value/rename-layout.rkt"
+         "../core/value/rename-buffer.rkt"
+         "../core/value/convert.rkt")
 
 ;; ffi vector 的 equal? 不比较内容，统一用 ->list 比
 (define (lv v) (f32vector->list v))

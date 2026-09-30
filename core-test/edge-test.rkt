@@ -4,8 +4,8 @@
 ;; 运行：racket racket-glsl/core-test/edge-test.rkt
 ;; ============================================================
 (require rackunit racket/string
-         "../core/gl-error.rkt"
-         "../core/rewrite.rkt")
+         "../core/tool/error.rkt"
+         "../core/glsl/rewrite.rkt")
 
 ;; ---------- 小工具 ----------
 

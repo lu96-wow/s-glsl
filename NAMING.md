@@ -36,16 +36,39 @@
 
 ## 三、层的归属（文件）
 
+`core/` 分三部分 + 胶水（详见 [core/LAYERS.md](core/LAYERS.md)）。
+
+**Part 2（`core/value/`）：每个逻辑 = 实现（Racket 名）+ `rename-*.rkt`（GLSL 名）**
+
+| 逻辑 | 实现（Racket 名） | rename（GLSL 名） |
+|---|---|---|
+| 类型与存储 | `core/value/type.rkt` | `rename-type.rkt`：`glsl-size`、`glsl-kind`、`glsl-byte-size` |
+| 构造 | `core/value/construct.rkt` | `rename-construct.rkt`：`vec3`、`mat4`、`dvec3` |
+| 交错布局 | `core/value/layout.rkt` | `rename-layout.rkt`：`glsl-struct` |
+| 缓冲 / 拼接 | `core/value/buffer.rkt` | `rename-buffer.rkt`：`gl-vec`、`concat-vecs` |
+| 向量运算 | `core/value/vec.rkt` | `rename-vec.rkt`：`v*` |
+| 矩阵运算 | `core/value/matrix.rkt` | `rename-matrix.rkt`：`matN-*` |
+| 场景变换 | `core/value/transform.rkt` | `rename-transform.rkt`：`mat4-look-at`、`mat4-perspective` |
+| 精度转换 | `core/value/convert.rkt` | （CPU 侧 Racket 风格优先，暂无 rename） |
+
+**Part 1（`core/glsl/`）：`(glsl)` 命名空间内的 GLSL 语言**
+
 | 文件 | 负责 | 典型名字 |
 |---|---|---|
-| `core/rename-vector.rkt` | 构造 + 数据布局 | `vec3`、`mat4`、`gl-vec*`、`glsl-size`、`glsl-struct` |
-| `core/vec-math.rkt` | 取用 + 运算（GLSL 内建镜像） | `v*`、`matN-*`、`->*` |
-| `core/transform.rkt` | 场景 / 相机变换（图形学约定） | `mat4-look-at`、`mat4-perspective` |
-| `core/opengl-rename.rkt` | OpenGL 符号的 kebab 映射 | `gl-create-shader`、`gl-uniform-matrix-4fv` |
-| `core/tool.rkt` | 编译（文本 → shader）+ 报错 | `compile-shader` |
-| `core/program.rkt` | program 生命周期 | `build-program`、`use-program`、`uniform-location` |
-| `core/glsl-interface.rkt` / `core/glsl-program.rkt` | 类型模型 / 产物 | `glsl-type`、`glsl-var`、`glsl-program` |
-| `core/rewrite.rkt` | 表面语法 `(glsl ...)` | `glsl`、`glsl-unquote` |
+| `core/glsl/core.rkt` | 字符串原语 | `glsl-decl`、`glsl-fn` |
+| `core/glsl/rewrite.rkt` | 表面语法 `(glsl ...)` | `glsl`、`glsl-unquote` |
+| `core/glsl/pretty.rkt` | 文本美化 | `glsl-pretty` |
+| `core/glsl/interface.rkt` | 类型模型 / 反射 | `glsl-type`、`glsl-var` |
+| `core/glsl/program.rkt` | 产物 + 源映射 | `glsl-program` |
+
+**Part 3 / 胶水**
+
+| 文件 | 负责 | 典型名字 |
+|---|---|---|
+| `core/opengl/rename.rkt` | OpenGL 符号的 kebab 映射 | `gl-create-shader`、`gl-uniform-matrix-4fv` |
+| `core/tool/compile.rkt` | 编译（文本 → shader）+ 报错 | `compile-shader` |
+| `core/tool/program.rkt` | program 生命周期 | `build-program`、`use-program`、`uniform-location` |
+| `core/tool/error.rkt` | 报错解析 / 定位 / 渲染 | `parse-gl-error-log`、`render-error` |
 
 ## 四、判据（新增名字前问三句）
 

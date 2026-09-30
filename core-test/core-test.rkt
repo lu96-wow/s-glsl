@@ -4,8 +4,9 @@
 ;; 运行：racket racket-glsl/core-test/core-test.rkt
 ;; ============================================================
 (require rackunit
-         "../core/core.rkt"
-         "../core/pretty.rkt")
+         ffi/vector
+         "../core/glsl/core.rkt"
+         "../core/glsl/pretty.rkt")
 
 ;; ---------- 原语断言 ----------
 (check-equal? (glsl-version 330 "core") "#version 330 core\n")

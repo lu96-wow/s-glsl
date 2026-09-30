@@ -7,10 +7,15 @@
 ;; 通过 = 打印 "double upload ok" 并 exit 0；失败 = 抛异常。
 ;; ============================================================
 (require racket/gui
-         "../core/opengl-rename.rkt"     ; gl-* 命名层（含 double 函数）
-         "../core/rewrite.rkt"           ; (glsl ...) 宏
-         "../core/rename-vector.rkt"     ; dvec*/concat-dvecs/glsl-stride-bytes
-         "../core/program.rkt")             ; build-program / uniform-location
+         ffi/vector
+         "../core/opengl/rename.rkt"     ; gl-* 命名层（含 double 函数）
+         "../core/glsl/rewrite.rkt"           ; (glsl ...) 宏
+         "../core/value/rename-type.rkt"
+         "../core/value/rename-construct.rkt"
+         "../core/value/rename-layout.rkt"
+         "../core/value/rename-buffer.rkt"
+         "../core/value/convert.rkt"     ; dvec*/concat-dvecs/glsl-stride-bytes
+         "../core/tool/program.rkt")             ; build-program / uniform-location
 
 ;; 一个离屏 GL 上下文（不必 show 窗口；with-gl-context 会按需创建上下文）
 (define cfg (new gl-config%))

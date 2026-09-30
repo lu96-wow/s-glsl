@@ -394,22 +394,39 @@ s-expr source: /path/to/file.rkt:12
 
 ## 分层与文件
 
+本项目是 Racket ↔ OpenGL 的桥梁，`core/` 内按「设计功能和逻辑」分成**三部分 + 一个胶水**：
+
 ```
-core/rewrite.rkt        (glsl ...) 宏：表面语法 → core 调用
-core/core.rkt           字符串原语（声明/表达式/语句/函数/结构的文本生成）
-core/pretty.rkt         GLSL 文本美化（缩进）
-core/glsl-interface.rkt 类型模型 + 接口反射（glsl-type / glsl-var / ...）
-core/glsl-program.rkt   glsl-program 产物 + 源映射
-core/gl-error.rkt       编译报错的解析 / 定位 / 渲染
-core/opengl-rename.rkt  OpenGL 名字映射（glCreateShader → gl-create-shader）
-core/tool.rkt           编译：GLSL 文本 → shader（+ 报错）
-core/program.rkt        program 生命周期：link / build / use / uniform / delete
-core/rename-vector.rkt  构造 + 数据布局（vecN/matN、gl-vec、glsl-struct）
-core/vec-math.rkt       取用 + 运算（GLSL 内建镜像）
-core/transform.rkt      场景 / 相机变换
-main.rkt                #lang glsl 的模块语言（重导 racket/base + 全套）
+core/glsl/              Part 1：(glsl) 命名空间内 —— GLSL 语言（隔离）
+core/glsl/core.rkt        字符串原语（声明/表达式/语句/函数/结构的文本生成）
+core/glsl/rewrite.rkt     (glsl ...) 宏：表面语法 → core 调用
+core/glsl/pretty.rkt      GLSL 文本美化（缩进）
+core/glsl/interface.rkt   类型模型 + 接口反射（glsl-type / glsl-var / ...）
+core/glsl/program.rkt     glsl-program 产物 + 源映射
+
+core/value/             Part 2：(glsl) 命名空间外 —— Racket-ffi 重实现（每逻辑一对）
+core/value/type.rkt       + rename-type.rkt      类型与存储
+core/value/construct.rkt  + rename-construct.rkt 构造（vecN/matN）
+core/value/layout.rkt     + rename-layout.rkt    交错布局 / glsl-struct
+core/value/buffer.rkt     + rename-buffer.rkt    缓冲 / gl-vec / concat-vecs
+core/value/vec.rkt        + rename-vec.rkt       向量运算（vec-add → vadd）
+core/value/matrix.rkt     + rename-matrix.rkt    矩阵运算（matrix-ref → mat4-ref）
+core/value/transform.rkt  + rename-transform.rkt 场景 / 相机变换
+core/value/convert.rkt    精度转换（->f32vector …）
+core/value/cvector.rkt    内部底座（运行时 cvector 原语，无 rename）
+
+core/opengl/rename.rkt  Part 3：(glsl) 命名空间外 —— OpenGL 名字映射（glCreateShader → gl-create-shader）
+core/tool/              胶水：把上面接起来
+core/tool/compile.rkt     编译：GLSL 文本 → shader（+ 报错）
+core/tool/program.rkt     program 生命周期：link / build / use / uniform / delete
+core/tool/error.rkt       编译报错的解析 / 定位 / 渲染
+
+main.rkt                #lang glsl 的模块语言（聚合 Part 1/2/3 + 胶水）
 lang/reader.rkt         #lang 声明（syntax/module-reader）
 ```
+
+依赖单向：`glsl/`、`value/`、`opengl/` 互不 require；`tool/` 是唯一组合点。
+详见 [core/LAYERS.md](core/LAYERS.md)。
 
 依赖方向单向：`rename-vector → vec-math → transform`；其余各层互相独立。
 

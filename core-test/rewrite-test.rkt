@@ -4,7 +4,8 @@
 ;; 运行：racket racket-glsl/core-test/rewrite-test.rkt
 ;; ============================================================
 (require rackunit
-         "../core/rewrite.rkt")
+         ffi/vector
+         "../core/glsl/rewrite.rkt")
 
 ;; (glsl ...) 返回 glsl-program；这里比较它的美化 src 与「原始串的美化」。
 ;; 原始串是重写层的真值，glsl-pretty 是确定性函数 → 等价于测重写层输出。

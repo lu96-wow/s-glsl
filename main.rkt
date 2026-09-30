@@ -1,53 +1,54 @@
 #lang racket/base
 
 ;; ============================================================
-;; glsl/main.rkt —— #lang glsl 的模块语言
+;; glsl/main.rkt —— #lang glsl 的模块语言（聚合入口）
 ;;
-;; 设计：body 仍然是**普通 Racket 模块**（不把整个模块当成 GLSL 解析）。
-;; 「#lang glsl」只是省掉一堆手写 require 的“GLSL 环境”：
+;; body 仍然是普通 Racket 模块；「#lang glsl」只是把下面这些预先 require 好：
 ;;
-;;   #lang glsl
-;;   (define vert
-;;     (glsl (version 330 core)
-;;           (layout (location 0) in vec3 aPos)
-;;           (uniform mat4 uMVP)
-;;           (define (main) void
-;;             (set! gl_Position (* uMVP (vec4 aPos 1.0))))))
+;;   Part 1 · core/glsl/rewrite.rkt       GLSL 语言（(glsl ...) 宏 + 产物 + 接口反射）
+;;   Part 2 · core/value/rename-*.rkt     Racket-ffi 重实现的 GLSL 风格命名
+;;            core/value/convert.rkt      精度转换（Racket 风格：->f32vector …）
+;;   Part 3 · core/opengl/rename.rkt      OpenGL → Racket 命名（gl-*）
+;;   胶水   · core/tool/{compile,program,error}.rkt   编译 / 链接 / 报错
+;;   地基   · ffi/vector                   裸 cvector（f32vector 等）
 ;;
-;;   (use-program (build-program (gl-vertex-shader vert) (gl-fragment-shader frag)))
-;;
-;; 等价于 #lang racket/base 再加上：
-;;   (require "core/rewrite.rkt"        ; (glsl ...) 宏 + glsl-program / 接口反射
-;;            "core/rename-vector.rkt"  ; vec2/vec3/mat4/... + ffi/vector
-;;            "core/vec-math.rkt"       ; CPU 侧取用/运算（dot/cross/normalize/mat-mul/inverse…）
-;;            "core/transform.rkt"      ; 场景/相机变换（look-at/perspective/translate/rot/…）
-;;            "core/tool.rkt"           ; compile-shader（文本 → shader + 报错）
-;;            "core/program.rkt"        ; link-program / build-program / use-program / ...
-;;            "core/opengl-rename.rkt"  ; gl-* 名字
-;;            "core/gl-error.rkt")      ; 报错定位/渲染
+;; 值层的 Racket 风格实现（vec-add / matrix-ref / …）不在这里导出；
+;; 需要时直接 require 对应 core/value/<逻辑>.rkt。
 ;;
 ;; reader 层见 lang/reader.rkt（#lang s-exp syntax/module-reader glsl/main）。
-;; 实现都在 core/ 下；本文件只负责「语言外观」＝ 把需要的文件一次 require 好。
 ;; ============================================================
 
-(require "core/rewrite.rkt"
-         "core/rename-vector.rkt"
-         "core/vec-math.rkt"      ; CPU 侧向量/矩阵取用与运算
-         "core/transform.rkt"     ; 场景/相机变换（look-at/perspective/...）
-         "core/tool.rkt"           ; compile-shader
-         "core/program.rkt"        ; link/build/use/uniform/delete
-         "core/opengl-rename.rkt"
-         "core/gl-error.rkt")
+(require ffi/vector
+         ;; Part 1：(glsl) 内 —— 语言（rewrite 已重导 core/pretty/interface/program）
+         "core/glsl/rewrite.rkt"
+         ;; Part 2：(glsl) 外 —— Racket-ffi 重实现的 GLSL 风格命名
+         "core/value/rename-type.rkt"
+         "core/value/rename-construct.rkt"
+         "core/value/rename-layout.rkt"
+         "core/value/rename-buffer.rkt"
+         "core/value/rename-vec.rkt"
+         "core/value/rename-matrix.rkt"
+         "core/value/rename-transform.rkt"
+         "core/value/convert.rkt"
+         ;; Part 3：(glsl) 外 —— OpenGL → Racket 命名
+         "core/opengl/rename.rkt"
+         ;; 胶水
+         "core/tool/compile.rkt"
+         "core/tool/program.rkt"
+         "core/tool/error.rkt")
 
-;; 重导 racket/base（含 #%module-begin / #%app / #%datum ...），
-;; 因此 body 照常按 Racket 语法展开：define / require / provide / lambda ... 都能用。
 (provide (all-from-out racket/base)
-         ;; racket-glsl 全套（rewrite 已含 core / pretty / glsl-interface / glsl-program）
-         (all-from-out "core/rewrite.rkt")
-         (all-from-out "core/rename-vector.rkt")
-         (all-from-out "core/vec-math.rkt")
-         (all-from-out "core/transform.rkt")
-         (all-from-out "core/tool.rkt")
-         (all-from-out "core/program.rkt")
-         (all-from-out "core/opengl-rename.rkt")
-         (all-from-out "core/gl-error.rkt"))
+         (all-from-out ffi/vector)
+         (all-from-out "core/glsl/rewrite.rkt")
+         (all-from-out "core/value/rename-type.rkt")
+         (all-from-out "core/value/rename-construct.rkt")
+         (all-from-out "core/value/rename-layout.rkt")
+         (all-from-out "core/value/rename-buffer.rkt")
+         (all-from-out "core/value/rename-vec.rkt")
+         (all-from-out "core/value/rename-matrix.rkt")
+         (all-from-out "core/value/rename-transform.rkt")
+         (all-from-out "core/value/convert.rkt")
+         (all-from-out "core/opengl/rename.rkt")
+         (all-from-out "core/tool/compile.rkt")
+         (all-from-out "core/tool/program.rkt")
+         (all-from-out "core/tool/error.rkt"))

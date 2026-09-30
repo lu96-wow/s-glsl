@@ -1,5 +1,5 @@
 #lang racket/base
-;; core-rebuild 冒烟：验证实现层 / rename 层 / 语言层 / OpenGL rename 都能加载并工作。
+;; core 冒烟：验证实现层 / rename 层 / 语言层 / OpenGL rename 都能加载并工作。
 (require rackunit
          ffi/vector
          "value/type.rkt"
@@ -87,4 +87,4 @@
 (check-true (regexp-match? #rx"OpenGL source:" rendered))
 (check-true (regexp-match? #rx"s-expr source:" rendered))
 
-(displayln "core-rebuild smoke: ALL OK")
+(displayln "core smoke: ALL OK")

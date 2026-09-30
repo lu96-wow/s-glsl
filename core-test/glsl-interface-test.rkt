@@ -4,8 +4,8 @@
 ;; 运行：racket racket-glsl/core-test/glsl-interface-test.rkt
 ;; ============================================================
 (require rackunit racket/list
-         "../core/glsl-interface.rkt"
-         "../core/rewrite.rkt")
+         "../core/glsl/interface.rkt"
+         "../core/glsl/rewrite.rkt")
 
 ;; ---------- ① 类型模型：内建类型 ----------
 (define (bt s) (builtin-glsl-type s))
