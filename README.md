@@ -474,7 +474,7 @@ racket core-test/rewrite-test.rkt
 ```
 
 覆盖：表面语法重写、字符串原语、美化、接口反射、报错定位、向量构造/布局/运算、
-场景变换，以及 `#lang glsl` 顶层入口（`core-test/lang-test.rkt`）。（`core-test/double-test.rkt` 需要显示器 + GL 4.0+。）
+场景变换、控制流嵌套（`core-test/control-flow-test.rkt`，+ GL 实编译 `control-flow-gl-test.rkt`），以及 `#lang glsl` 顶层入口（`core-test/lang-test.rkt`）。（`core-test/double-test.rkt` 需要显示器 + GL 4.0+。）
 
 ---
 

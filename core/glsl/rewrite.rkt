@@ -170,7 +170,10 @@
         [else
          (define cl (car cs))
          (if (eq? (car cl) 'else)
-             (rw-body (cdr cl))
+             ;; else 分支：单语句直接返回（避免 (cond [else x]) 多包一层裸块）；
+             ;; 多语句没法拆成多个顶层 form，仍用块包。
+             (let ([stmts (map rw-stmt (cdr cl))])
+               (if (= 1 (length stmts)) (car stmts) (cons 'glsl-block stmts)))
              (list 'glsl-if (rw-expr (car cl)) (rw-body (cdr cl)) (go (cdr cs))))])))
 
   (define (rw-switch args)
