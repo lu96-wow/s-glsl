@@ -48,7 +48,7 @@ GL 对象/状态/窗口（buffer、VAO、texture、FBO、uniform 上传、事件
 ```bash
 git clone https://github.com/lu96-wow/s-glsl.git
 cd s-glsl
-raco pkg install --auto --link .
+raco pkg install --auto --link
 ```
 
 依赖（会由 `--auto` 自动装）：`base`、`gui-lib`、`rackunit-lib`、`opengl`。
