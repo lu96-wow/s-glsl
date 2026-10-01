@@ -29,7 +29,6 @@
          "core/value/rename-buffer.rkt"
          "core/value/rename-vec.rkt"
          "core/value/rename-matrix.rkt"
-         "core/value/rename-transform.rkt"
          "core/value/convert.rkt"
          ;; Part 3：(glsl) 外 —— OpenGL → Racket 命名
          "core/opengl/rename.rkt"
@@ -48,7 +47,6 @@
          (all-from-out "core/value/rename-buffer.rkt")
          (all-from-out "core/value/rename-vec.rkt")
          (all-from-out "core/value/rename-matrix.rkt")
-         (all-from-out "core/value/rename-transform.rkt")
          (all-from-out "core/value/convert.rkt")
          (all-from-out "core/opengl/rename.rkt")
          (all-from-out "core/tool/compile.rkt")

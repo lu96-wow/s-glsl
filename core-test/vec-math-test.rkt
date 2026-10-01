@@ -61,7 +61,7 @@
 (check-equal? (lf (vstep 2.0 (vec2 1.0 3.0))) '(0 1000000))
 (check-equal? (lf (vreflect (vec3 1.0 -1.0 0.0) (vec3 0.0 1.0 0.0))) '(1000000 1000000 0))
 
-;; ---------- 矩阵：基本（只用 mat4 字面量，不依赖 transform.rkt）----------
+;; ---------- 矩阵：基本（只用 mat4 字面量）----------
 (define I4 (mat4-identity))
 (check-equal? (lf I4) '(1000000 0 0 0  0 1000000 0 0  0 0 1000000 0  0 0 0 1000000))
 (check-equal? (mat4-ref I4 2 2) 1.0)

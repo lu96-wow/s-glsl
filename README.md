@@ -21,9 +21,11 @@ GL 对象/状态/窗口（buffer、VAO、texture、FBO、uniform 上传、事件
           (set! gl_Position (* uMVP (vec4 aPos 1.0))))))
 
 ;; CPU 侧用同名类型算矩阵，不碰裸 ffi
-(define V (mat4-look-at (vec3 0.0 0.0 3.0) (vec3 0.0 0.0 0.0) (vec3 0.0 1.0 0.0)))
-(define P (mat4-perspective 45.0 (/ 16.0 9.0) 0.1 100.0))
-(define M (mat4-mul P V))
+(define M (mat4 1.0 0.0 0.0 0.0
+               0.0 1.0 0.0 0.0
+               0.0 0.0 1.0 0.0
+               0.0 0.0 0.0 1.0))
+(define p (mat4-mul-vec M (vec4 1.0 2.0 3.0 1.0)))
 ```
 
 ---
@@ -245,7 +247,7 @@ CPU 侧的 GLSL 值就是货真价实的 `ffi/vector`（零拷贝、可直接上
 (concat-vecs (vec2 ..) (vec2 ..))
 ```
 
-### 取用 / 运算（`vec-math`）
+### 取用 / 运算（`vec` / `matrix`）
 
 ```racket
 ;; 分量
@@ -274,23 +276,6 @@ CPU 侧的 GLSL 值就是货真价实的 `ffi/vector`（零拷贝、可直接上
 - 向量宽度由 cvector 长度自动得到（`vadd` 不需要宽度参数）；
   矩阵阶写进名字（`mat4-*`），因为运行期区分不出 `vec4` 和 `mat2`。
 - 运算返回新值；`vset!` / `mat*-set!` 原地写。
-
-### 场景 / 相机变换（`transform`）
-
-```racket
-(mat4-translate x y z)
-(mat4-rot-x deg) (mat4-rot-y deg) (mat4-rot-z deg)
-(mat4-scaling sx sy sz)
-(mat4-look-at eye center up)                       ; 视图矩阵
-(mat4-ortho l r b t n f)                           ; 正交投影
-(mat4-perspective fovy aspect near far)            ; 透视投影（fovy 用度）
-```
-
-约定：右手系、列主序、角度制。典型 MVP：
-
-```racket
-(define mvp (mat4-mul (mat4-mul P V) M))
-```
 
 ### 顶点布局（`glsl-struct`）
 
@@ -411,8 +396,7 @@ core/value/construct.rkt  + rename-construct.rkt 构造（vecN/matN）
 core/value/layout.rkt     + rename-layout.rkt    交错布局 / glsl-struct
 core/value/buffer.rkt     + rename-buffer.rkt    缓冲 / gl-vec / concat-vecs
 core/value/vec.rkt        + rename-vec.rkt       向量运算（vec-add → vadd）
-core/value/matrix.rkt     + rename-matrix.rkt    矩阵运算（matrix-ref → mat4-ref）
-core/value/transform.rkt  + rename-transform.rkt 场景 / 相机变换
+core/value/matrix.rkt    + rename-matrix.rkt   矩阵运算（matrix-ref → mat4-ref）
 core/value/convert.rkt    精度转换（->f32vector …）
 core/value/cvector.rkt    内部底座（运行时 cvector 原语，无 rename）
 
@@ -429,7 +413,7 @@ lang/reader.rkt         #lang 声明（syntax/module-reader）
 依赖单向：`glsl/`、`value/`、`opengl/` 互不 require；`tool/` 是唯一组合点。
 详见 [core/LAYERS.md](core/LAYERS.md)。
 
-依赖方向单向：`rename-vector → vec-math → transform`；其余各层互相独立。
+依赖方向单向：`construct → access → {vec, matrix, convert}`；其余各层互相独立。
 
 ---
 
@@ -446,7 +430,6 @@ lang/reader.rkt         #lang 声明（syntax/module-reader）
 | `vecN` / `matN` | GLSL 类型构造器 | `vec3`、`mat4` |
 | `v*` | 向量取用 / 运算 | `vref`、`vadd`、`vdot` |
 | `matN-*` | 矩阵取用 / 运算 | `mat4-ref`、`mat4-mul` |
-| `mat4-<场景词>` | 场景 / 相机变换 | `mat4-look-at`、`mat4-perspective` |
 
 ---
 
@@ -458,6 +441,9 @@ lang/reader.rkt         #lang 声明（syntax/module-reader）
 - GL 对象与状态：`gen-buffer` / 上传 / 属性绑定 / uniform 上传 / 纹理 / FBO
 - 窗口与事件循环
 - UBO/SSBO 绑定、compute dispatch、program pipeline、program binary
+- 图形学数学约定：`look-at` / `perspective` / `ortho` / `translate` / `rotate` / `scale`
+  （GLSL 无对应物，不属于桥接；本库只提供 `vec3`/`mat4` 与 `mat4-mul` 等 GLSL 内建对应的运算，
+  调用方用它们自行构造相机/投影矩阵）
 
 本库提供 `gl-*`（OpenGL 名字）作为地基，但这些「GL 资源/状态」的助手刻意不做——
 它们不属于「使用 GLSL」，属于「使用 OpenGL」。
@@ -474,7 +460,8 @@ racket core-test/rewrite-test.rkt
 ```
 
 覆盖：表面语法重写、字符串原语、美化、接口反射、报错定位、向量构造/布局/运算、
-场景变换、控制流嵌套（`core-test/control-flow-test.rkt`，+ GL 实编译 `control-flow-gl-test.rkt`），以及 `#lang glsl` 顶层入口（`core-test/lang-test.rkt`）。（`core-test/double-test.rkt` 需要显示器 + GL 4.0+。）
+向量与矩阵运算、控制流嵌套（`core-test/control-flow-test.rkt`，+ GL 实编译 `control-flow-gl-test.rkt`），
+以及 `#lang glsl` 顶层入口（`core-test/lang-test.rkt`）。（`core-test/double-test.rkt` 需要显示器 + GL 4.0+。）
 
 ---
 

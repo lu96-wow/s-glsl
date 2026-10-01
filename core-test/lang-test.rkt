@@ -74,8 +74,8 @@
 (check-equal? (glsl-byte-size 'vec3) 12)
 (check-equal? (glsl-stride-bytes 'vec3 'vec2) 20)
 
-(define M (mat4-look-at (vec3 0.0 0.0 5.0) (vec3 0.0 0.0 0.0) (vec3 0.0 1.0 0.0)))
-(check-equal? (vz (mat4-mul-vec M (vec4 0.0 0.0 0.0 1.0))) -5.0)
+(define M (mat4 2.0))                                 ; 对角矩阵
+(check-equal? (vz (mat4-mul-vec M (vec4 0.0 0.0 1.0 1.0))) 2.0)
 
 (glsl-struct vertex (vec3 pos) (vec3 color))
 (define v0 (vertex (vec3 1.0 2.0 3.0) (vec3 1.0 0.0 0.0)))

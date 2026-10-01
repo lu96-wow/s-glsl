@@ -13,7 +13,6 @@
 | `vecN`/`dvecN`/`ivecN`/`uvecN`/`bvecN`、`matN`/`dmatN` | **GLSL 类型构造器** | `vec3`、`mat4`、`dvec3`、`uvec4` |
 | `v*` | **向量取用 / 运算** | `vx`、`vref`、`vset!`、`vcount`、`vadd`、`vdot`、`vnormalize` |
 | `matN-*` | **矩阵取用 / 运算** | `mat4-ref`、`mat4-mul`、`mat4-inverse`、`mat4-transpose` |
-| `mat4-<场景词>` | **场景 / 相机变换**（`transform.rkt`） | `mat4-look-at`、`mat4-perspective`、`mat4-ortho` |
 | `->X` | **Racket 风格转换** | `->f32vector`、`->s32vector` |
 
 ## 二、规则
@@ -49,7 +48,6 @@
 | 缓冲 / 拼接 | `core/value/buffer.rkt` | `rename-buffer.rkt`：`gl-vec`、`concat-vecs` |
 | 向量运算 | `core/value/vec.rkt` | `rename-vec.rkt`：`v*` |
 | 矩阵运算 | `core/value/matrix.rkt` | `rename-matrix.rkt`：`matN-*` |
-| 场景变换 | `core/value/transform.rkt` | `rename-transform.rkt`：`mat4-look-at`、`mat4-perspective` |
 | 精度转换 | `core/value/convert.rkt` | （CPU 侧 Racket 风格优先，暂无 rename） |
 
 **Part 1（`core/glsl/`）：`(glsl)` 命名空间内的 GLSL 语言**
@@ -71,10 +69,9 @@
 | `core/tool/program.rkt` | program 生命周期 | `build-program`、`use-program`、`uniform-location` |
 | `core/tool/error.rkt` | 报错解析 / 定位 / 渲染 | `parse-gl-error-log`、`render-error` |
 
-## 四、判据（新增名字前问三句）
+## 四、判据（新增名字前问两句）
 
-1. 这是 GLSL 里有对应物的**运算/取用**吗？→ `v*` / `matN-*`（`vec-math.rkt`）。
-2. 这是**图形学约定**（相机/投影/变换）吗？→ `mat4-<场景词>`（`transform.rkt`）。
-3. 这是**本 DSL 的概念**（语言/布局/类型）吗？→ `glsl-*`；若是 CPU 缓冲类型 → `gl-vec-*`。
+1. 这是 GLSL 里有对应物的**运算/取用**吗？→ `v*` / `matN-*`（`vec.rkt` / `matrix.rkt`）。
+2. 这是**本 DSL 的概念**（语言/布局/类型）吗？→ `glsl-*`；若是 CPU 缓冲类型 → `gl-vec-*`。
 
 都不属于 → 大概率不该加，或该放在调用方。

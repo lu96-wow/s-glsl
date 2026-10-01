@@ -52,7 +52,6 @@ A、B 谁都不 require 对方。
 | 缓冲 / 拼接 | `value/buffer.rkt` | `value/rename-buffer.rkt`：`gl-vec / concat-vecs / …` |
 | 向量运算 | `value/vec.rkt` | `value/rename-vec.rkt`：`vadd / vdot / vnormalize / …` |
 | 矩阵运算 | `value/matrix.rkt` | `value/rename-matrix.rkt`：`mat4-ref(col,row) / mat4-mul / …` |
-| 场景变换 | `value/transform.rkt` | `value/rename-transform.rkt`：`mat4-look-at / mat4-perspective / …` |
 | 精度转换 | `value/convert.rkt` | 无（CPU 侧 Racket 风格优先） |
 
 内部共享底座：`value/cvector.rkt`（运行时 cvector 原语），不是用户 API，因此没有 rename。
@@ -63,8 +62,7 @@ A、B 谁都不 require 对方。
 value/cvector.rkt  ←  value/type.rkt, value/access.rkt, value/construct.rkt,
                       value/layout.rkt, value/vec.rkt, value/matrix.rkt, value/convert.rkt
 value/buffer.rkt   ←  value/access.rkt
-value/access.rkt   ←  value/matrix.rkt, value/transform.rkt
-value/vec.rkt      ←  value/transform.rkt
+value/access.rkt   ←  value/matrix.rkt
 value/rename-*.rkt →  只依赖对应的 value/<逻辑>.rkt（零逻辑）
 ```
 
@@ -94,7 +92,7 @@ value/rename-*.rkt →  只依赖对应的 value/<逻辑>.rkt（零逻辑）
 ## `#lang glsl` 聚合（`main.rkt`）
 
 `main.rkt` require：Part 1 `glsl/rewrite.rkt`（重导 core/pretty/interface/program）、
-Part 2 的 8 个 `value/rename-*.rkt` + `value/convert.rkt`、Part 3 `opengl/rename.rkt`、
+Part 2 的 7 个 `value/rename-*.rkt` + `value/convert.rkt`、Part 3 `opengl/rename.rkt`、
 胶水 `tool/{compile,program,error}.rkt`、`ffi/vector`；
 provide 上述全部（GLSL 风格 API）。值层的 Racket 风格实现（`vec-add` / `matrix-ref` …）
 不在这里导出，需要时直接 require `value/<逻辑>.rkt`。
@@ -110,7 +108,6 @@ provide 上述全部（GLSL 风格 API）。值层的 Racket 风格实现（`vec
 | `core/rewrite.rkt` | `glsl/rewrite.rkt` |
 | `core/rename-vector.rkt` | `value/{type,construct,layout,buffer}.rkt` + `value/rename-{type,construct,layout,buffer}.rkt`（缓冲元素取用归 `access.rkt`） |
 | `core/vec-math.rkt` | `value/{cvector,access,vec,matrix,convert}.rkt` + `value/rename-{access,vec,matrix}.rkt` |
-| `core/transform.rkt` | `value/transform.rkt` + `value/rename-transform.rkt` |
 | `core/opengl-rename.rkt` | `opengl/rename.rkt` |
 | `core/tool.rkt` | `tool/compile.rkt` |
 | `core/program.rkt` | `tool/program.rkt` |
