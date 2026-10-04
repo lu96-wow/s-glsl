@@ -9,7 +9,7 @@
 | 裸名、`?`、`!`、`->` | **Racket / `racket/base`**（我们不遮蔽） | `length`、`vector-ref`、`set!`、`exact->inexact` |
 | `gl-<opengl符号>` | **OpenGL C API 的 1:1 机械映射** | `glCreateShader` → `gl-create-shader` |
 | `glsl-*` | **本 DSL 的语言层概念** | `glsl-size`、`glsl-struct`、`glsl-program`、`glsl-interface`、`glsl-kind` |
-| `vec-array*` | **本 DSL 的 CPU 向量数组类型**（自有类型，不带 `gl-`） | `vec-array`、`vec-array-ref`、`vec-array-count`、`vec-array-data` |
+| `vec-array*` | **本 DSL 的 CPU 向量数组类型**（自有类型，不带 `gl-`；按名字区分元素：`vec-array`=f32、`dvec-array`=f64、`ivec-array`=s32、`uvec-array`=u32） | `vec-array`、`ivec-array`、`vec-array-ref`、`vec-array-data` |
 | `vecN`/`dvecN`/`ivecN`/`uvecN`/`bvecN`、`matN`/`dmatN` | **GLSL 类型构造器** | `vec3`、`mat4`、`dvec3`、`uvec4` |
 | `v*` | **向量取用 / 运算** | `vx`、`vref`、`vset!`、`vcount`、`vadd`、`vdot`、`vnormalize` |
 | `matN-*` | **矩阵取用 / 运算** | `mat4-ref`、`mat4-mul`、`mat4-inverse`、`mat4-transpose` |

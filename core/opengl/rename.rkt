@@ -156,6 +156,10 @@
 (define gl-element-array-buffer    GL_ELEMENT_ARRAY_BUFFER)
 (define gl-false                   GL_FALSE)
 (define gl-float                   GL_FLOAT)
+;; 整数顶点属性常用类型（配 gl-vertex-attrib-ip-pointer）
+(define gl-byte                    GL_BYTE)
+(define gl-short                   GL_SHORT)
+(define gl-int                     GL_INT)
 (define gl-fragment-shader         GL_FRAGMENT_SHADER)
 (define gl-framebuffer             GL_FRAMEBUFFER)
 (define gl-framebuffer-complete    GL_FRAMEBUFFER_COMPLETE)
