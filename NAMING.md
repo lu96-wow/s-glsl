@@ -70,8 +70,8 @@
 | 文件 | 负责 | 典型名字 |
 |---|---|---|
 | `core/opengl/rename.rkt` | OpenGL 符号的 kebab 映射 | `gl-create-shader`、`gl-uniform-matrix-4fv` |
-| `core/tool/compile.rkt` | 编译（文本 → shader）+ 报错 | `compile-shader` |
-| `core/tool/program.rkt` | program 生命周期 | `build-program`、`use-program`、`uniform-location` |
+| `core/tool/compile.rkt` | 编译（文本 → shader）+ 报错 | `shader-compile` |
+| `core/tool/program.rkt` | program 生命周期 | `program-link`、`build-program`、`program-use`、`uniform-location` |
 | `core/tool/error.rkt` | 报错解析 / 定位 / 渲染 | `parse-gl-error-log`、`render-error` |
 
 ## 四、判据（新增名字前问两句）

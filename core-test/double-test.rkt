@@ -46,8 +46,8 @@
     ;; ① 编译链接 double 着色器
     (define prog (build-program (gl-vertex-shader vert-src)
                                 (gl-fragment-shader frag-src)))
-    ;; ② double uniform（glUniform* 操作"当前程序"，先 use-program）
-    (use-program prog)
+    ;; ② double uniform（glUniform* 操作"当前程序"，先 program-use）
+    (program-use prog)
     (define loc (uniform-location prog "uScale"))
     (gl-uniform-1d loc 1.0)
     ;; ③ f64vector VBO 上传

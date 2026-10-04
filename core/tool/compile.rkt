@@ -4,7 +4,7 @@
 ;; 胶水 · tool/compile.rkt —— GLSL 文本 → shader 对象 + 报错封装
 ;;
 ;; 只做一件事：把一段 GLSL 文本编译成 shader 对象，并把编译报错讲清楚。
-;;   ① compile-shader：文本（glsl-program 或字符串）→ 编译好的 shader 对象
+;;   ① shader-compile：文本（glsl-program 或字符串）→ 编译好的 shader 对象
 ;;   ② 失败时三段式报错：OpenGL 日志 / 美化 GLSL + 报错行 / 源文件对应行
 ;;      （解析 / 定位 / 渲染在 gl-error.rkt，本文件负责触发与抛出）
 ;;
@@ -23,7 +23,7 @@
          "error.rkt"      ; parse-gl-error-log / locate-gl-error / render-error
          ffi/vector)         ; s32vector
 
-(provide compile-shader)
+(provide shader-compile compile-shader)   ; compile-shader = deprecated alias
 
 ;; ---------- 内部：编译信息日志 ----------
 
@@ -41,7 +41,7 @@
 ;; type 是任意着色器阶段：gl-vertex-shader / gl-tess-control-shader /
 ;; gl-tess-evaluation-shader / gl-geometry-shader / gl-fragment-shader。
 ;; 编译失败自动抛错，错误消息带 GLSL 报错日志 + 源映射。
-(define (compile-shader type src)
+(define (shader-compile type src)
   ;; 先统一成"美化后的字符串"再编译，报错行号因此对齐美化版：
   ;;   glsl-program（(glsl ...) 的产物）→ 它的 src 已经是美化串，直接用；
   ;;   裸字符串 → 现做 glsl-pretty。
@@ -59,7 +59,10 @@
                          (parse-gl-error-log log)))
     ;; 这个 shader 是本函数创建的，编译失败也要释放，否则句柄丢失就泄漏
     (gl-delete-shader shader)
-    (error 'compile-shader
+    (error 'shader-compile
            "shader compile failed:\n\n~a"
            (render-error log ctx located)))
   shader)
+
+;; 旧名（deprecated，下个大版本删）
+(define compile-shader shader-compile)

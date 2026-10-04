@@ -42,7 +42,7 @@
     ;; ① 编译链接
     (define prog (build-program (gl-vertex-shader vert-src)
                                 (gl-fragment-shader frag-src)))
-    (use-program prog)
+    (program-use prog)
     ;; ② s32vector VBO 上传（3 个 ivec3）
     (define data (s32vector 1 0 0   0 1 0   1 1 0))
     (define vbo (u32vector-ref (gl-gen-buffers 1) 0))

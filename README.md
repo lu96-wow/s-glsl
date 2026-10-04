@@ -350,7 +350,7 @@ CPU 侧的 GLSL 值就是货真价实的 `ffi/vector`（零拷贝、可直接上
 (build-program (gl-vertex-shader vert) (gl-fragment-shader frag))          ; 宏
 (build-program/list (list (list gl-vertex-shader vert) ...))               ; 函数版
 
-(use-program prog)
+(program-use prog)
 (uniform-location prog "uMVP")   ; 找不到返回 -1
 ```
 
@@ -372,7 +372,7 @@ s-expr source: /path/to/file.rkt:12
 即：GL 原始日志 → 美化后的 GLSL + 报错行 → 对应的 `.rkt` 源文件行。
 （源映射精确到行；裸字符串没有 `.rkt` 映射，只有美化 GLSL。）
 
-所有权约定：`compile-shader` / `link-program` 失败时会释放自己创建的 GL 对象；
+所有权约定：`shader-compile` / `program-link` 失败时会释放自己创建的 GL 对象；
 `build-program/list` 链接成功后 **detach + delete** 中间 shader，不泄漏。
 
 ---

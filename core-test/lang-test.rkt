@@ -91,8 +91,15 @@
 ;; ---------- Part 3 + 胶水符号可用 ----------
 
 (check-true (procedure? gl-create-shader))
+(check-true (procedure? shader-compile))
+(check-true (procedure? program-link))
+(check-true (procedure? program-use))
+(check-true (procedure? shader-delete))
+(check-true (procedure? program-delete))
+;; 旧名（deprecated）仍是子程序
 (check-true (procedure? compile-shader))
 (check-true (procedure? link-program))
+(check-true (procedure? use-program))
 (check-true (procedure? parse-gl-error-log))
 
 (displayln "lang 全部测试通过")
