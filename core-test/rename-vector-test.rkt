@@ -221,4 +221,43 @@
 (check-exn exn:fail? (lambda () (mrec->bytes (mrec (vec3 1.0 2.0 3.0) 7.5))))  ; int 字段给非整数
 (check-exn exn:fail? (lambda () (urec->u32vector (urec (uvec3 1 2 3) -1))))     ; uint 给负数
 
+;; ---------- 整数 / double 向量数组（按名字区分 kind，无 kind 参数）----------
+(define iv (ivec-array (ivec3 1 2 3) (ivec3 4 5 6)))
+(check-true (vec-array? iv))
+(check-equal? (vec-array-count iv) 2)
+(check-equal? (vec-array-width iv) 3)
+(check-true (s32vector? (vec-array-data iv)))
+(check-equal? (li (vec-array-data iv)) '(1 2 3 4 5 6))
+(check-equal? (li (vec-array-ref iv 1)) '(4 5 6))
+(vec-array-set! iv 0 (ivec3 9 9 9))
+(check-equal? (li (vec-array-data iv)) '(9 9 9 4 5 6))
+
+(define dv (dvec-array (dvec2 1.0 2.0)))
+(check-true (f64vector? (vec-array-data dv)))
+(check-equal? (ld (vec-array-data dv)) '(1.0 2.0))
+
+(define uv (make-uvec-array 3 (uvec2 0 0)))
+(check-equal? (vec-array-count uv) 3)
+(check-equal? (lu (vec-array-ref uv 2)) '(0 0))
+
+;; kind 不对要报错
+(check-exn exn:fail? (lambda () (ivec-array (vec3 1.0 2.0 3.0))))     ; 给了 float
+(check-exn exn:fail? (lambda () (vec-array (ivec3 1 2 3))))            ; vec-array 只收 float
+(check-exn exn:fail? (lambda () (vec-array-set! iv 0 (uvec3 1 2 3))))  ; 元素类别不匹配
+
+;; 整数拼接
+(check-equal? (li (concat-ivecs (ivec2 1 2) (ivec2 3 4))) '(1 2 3 4))
+(check-equal? (lu (concat-uvecs (uvec2 1 2))) '(1 2))
+
+;; ---------- glsl-struct 新生成名 ----------
+(glsl-struct p3 (vec3 pos) (vec3 color))
+(check-equal? (p3-stride-bytes) 24)
+(check-equal? (p3-field-components 'pos) 3)
+(check-equal? (f32vector-length (p3->f32vector (p3 (vec3 1.0 2.0 3.0) (vec3 4.0 5.0 6.0)))) 6)
+
+;; ---------- 类型消歧新名 ----------
+(check-equal? (glsl-element-count 'vec3) 3)
+(check-equal? (glsl-storage-kind 'vec3) 'f32)
+(check-equal? (glsl-stride-elements 'vec3 'vec2) 5)
+
 (displayln "rename-vector 全部测试通过")

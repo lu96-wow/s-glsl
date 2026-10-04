@@ -21,7 +21,7 @@
 (provide type-table type-entry type-known? type-elements type-kind
          type-component-bytes type-byte-size type-stride
          kind-component-bytes kind-vector? kind-length kind-ref kind-set!
-         kind-ctor kind->name
+         kind-ctor kind-make kind->name
          float-kind? double-kind? int-kind?)
 
 ;; ---------- 表 ----------
@@ -86,6 +86,9 @@
           [(s32) s32vector-set!] [(u32) u32vector-set!]))
 (define (kind-ctor k)
   (case k [(f32) f32vector] [(f64) f64vector] [(s32) s32vector] [(u32) u32vector]))
+(define (kind-make k)
+  (case k [(f32) make-f32vector] [(f64) make-f64vector]
+          [(s32) make-s32vector] [(u32) make-u32vector]))
 (define (kind->name k)
   (case k [(f32) "f32vector"] [(f64) "f64vector"]
           [(s32) "s32vector"] [(u32) "u32vector"]))

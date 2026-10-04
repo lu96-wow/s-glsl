@@ -120,6 +120,18 @@
 (define gl-vertex-attrib-l-2d         glVertexAttribL2d)
 (define gl-vertex-attrib-l-3d         glVertexAttribL3d)
 (define gl-vertex-attrib-l-4d         glVertexAttribL4d)
+;; 整数顶点属性（I = integer，值原样进 shader 的 in ivec*/uvec*）
+(define gl-vertex-attrib-ip-pointer   glVertexAttribIPointer)
+(define gl-vertex-attrib-i1i          glVertexAttribI1i)
+(define gl-vertex-attrib-i1ui         glVertexAttribI1ui)
+(define gl-vertex-attrib-i2i          glVertexAttribI2i)
+(define gl-vertex-attrib-i2ui         glVertexAttribI2ui)
+(define gl-vertex-attrib-i3i          glVertexAttribI3i)
+(define gl-vertex-attrib-i3ui         glVertexAttribI3ui)
+(define gl-vertex-attrib-i4i          glVertexAttribI4i)
+(define gl-vertex-attrib-i4ui         glVertexAttribI4ui)
+(define gl-vertex-attrib-i4iv         glVertexAttribI4iv)
+(define gl-vertex-attrib-i4uiv        glVertexAttribI4uiv)
 (define gl-viewport                   glViewport)
 
 ;; ---------- 常量：全大写下划线 → kebab-case ----------
