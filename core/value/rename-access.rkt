@@ -21,11 +21,17 @@
 (define vz vec-z)
 (define vw vec-w)
 
-;; ---------- 顶点缓冲元素 ----------
+;; ---------- CPU 向量数组（新名） ----------
 
-(define gl-vec-count vec-buffer-count)
-(define gl-vec-ref vec-buffer-ref)
-(define gl-vec-set! vec-buffer-set!)
+(define vec-array-count vec-buffer-count)
+(define vec-array-ref vec-buffer-ref)
+(define vec-array-set! vec-buffer-set!)
+
+;; ---------- 旧名（deprecated，等价别名）----------
+
+(define gl-vec-count vec-array-count)
+(define gl-vec-ref vec-array-ref)
+(define gl-vec-set! vec-array-set!)
 
 ;; ---------- 矩阵元素（GLSL 顺序 col,row → Racket row,col） ----------
 

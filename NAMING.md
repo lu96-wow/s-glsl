@@ -9,7 +9,7 @@
 | 裸名、`?`、`!`、`->` | **Racket / `racket/base`**（我们不遮蔽） | `length`、`vector-ref`、`set!`、`exact->inexact` |
 | `gl-<opengl符号>` | **OpenGL C API 的 1:1 机械映射** | `glCreateShader` → `gl-create-shader` |
 | `glsl-*` | **本 DSL 的语言层概念** | `glsl-size`、`glsl-struct`、`glsl-program`、`glsl-interface`、`glsl-kind` |
-| `gl-vec*` | **本 DSL 的 CPU 缓冲类型** | `gl-vec`、`gl-vec-ref`、`gl-vec-count`、`gl-vec->f32vector` |
+| `vec-array*` | **本 DSL 的 CPU 向量数组类型**（自有类型，不带 `gl-`） | `vec-array`、`vec-array-ref`、`vec-array-count`、`vec-array-data` |
 | `vecN`/`dvecN`/`ivecN`/`uvecN`/`bvecN`、`matN`/`dmatN` | **GLSL 类型构造器** | `vec3`、`mat4`、`dvec3`、`uvec4` |
 | `v*` | **向量取用 / 运算** | `vx`、`vref`、`vset!`、`vcount`、`vadd`、`vdot`、`vnormalize` |
 | `matN-*` | **矩阵取用 / 运算** | `mat4-ref`、`mat4-mul`、`mat4-inverse`、`mat4-transpose` |
@@ -17,9 +17,9 @@
 
 ## 二、规则
 
-1. **`gl-` 有两种用法，但可区分**
-   - `gl-<动词>…` ↔ OpenGL C 符号（`gl-create-shader` ↔ `glCreateShader`）：**只做机械映射，不发明**。
-   - `gl-vec-*` = 我们自己的缓冲**类型**前缀（`gl-vec` 是一个类型名，不对应任何 `glXxx`）。
+1. **`gl-` 只给 OpenGL C 符号的 1:1 机械映射**（`gl-create-shader` ↔ `glCreateShader`、
+   `gl-array-buffer` ↔ `GL_ARRAY_BUFFER`）：**只做机械映射，不发明**。
+   我们自己的数据类型一律不带 `gl-`：CPU 向量数组叫 `vec-array`，不叫 `gl-vec`。
 
 2. **不发明新的 `gl-<动词>` 名字**。要加自己的东西，用 `glsl-*`（语言层）或 `v*`/`mat*`（值层）。
 
@@ -29,9 +29,14 @@
    - 向量宽度可由 cvector 长度推出 → 泛型 `v*`，不带宽度。
    - 矩阵阶推不出（`f32vector` 长度 4 可能是 `vec4` 也可能是 `mat2`）→ 写进名字：`mat4-*`。
 
-5. **全名优先于缩写**：`gl-vec-ref`（不是 `vec-ref`），避免和 `vref`/`vcount` 混。
+5. **全名优先于缩写**：`vec-array-ref`（不是 `vec-ref`），避免和 `vref`/`vcount` 混。
 
-6. **Racket 惯例**：kebab-case；谓词 `?`（`vec?`）；原地修改 `!`（`vset!`、`gl-vec-set!`）；转换 `->`（`->f32vector`）。
+6. **Racket 惯例**：kebab-case；谓词 `?`（`vec?`）；原地修改 `!`（`vset!`、`vec-array-set!`）；转换 `->`（`->f32vector`）。
+7. **取数据 ≠ 转换**：取内部存储（零拷贝）用 `X-data`；真正的类型转换用 `->type`。
+8. **一个词只表示一件事**：存储类别用 `storage-kind`（不写裸 `kind`）；元素数用 `element-count`；
+   字节数名字里必须带 `byte(s)`；stride 一律写 `stride-bytes`（不写裸 `stride`）。
+9. **工具层不与 raw 层同基名**：`compile-shader` 与 `gl-compile-shader` 这种只差 `gl-` 的对照，
+   要么在文档里明确标注，要么改成不易混的名字（如 `shader-compile`）。
 
 ## 三、层的归属（文件）
 
@@ -45,7 +50,7 @@
 | 取用（索引读写） | `core/value/access.rkt` | `rename-access.rkt`：`vcount`、`vref`、`mat4-ref`、`gl-vec-ref` |
 | 构造 | `core/value/construct.rkt` | `rename-construct.rkt`：`vec3`、`mat4`、`dvec3` |
 | 交错布局 | `core/value/layout.rkt` | `rename-layout.rkt`：`glsl-struct` |
-| 缓冲 / 拼接 | `core/value/buffer.rkt` | `rename-buffer.rkt`：`gl-vec`、`concat-vecs` |
+| 缓冲 / 拼接 | `core/value/buffer.rkt` | `rename-buffer.rkt`：`vec-array`、`concat-vecs` |
 | 向量运算 | `core/value/vec.rkt` | `rename-vec.rkt`：`v*` |
 | 矩阵运算 | `core/value/matrix.rkt` | `rename-matrix.rkt`：`matN-*` |
 | 精度转换 | `core/value/convert.rkt` | （CPU 侧 Racket 风格优先，暂无 rename） |

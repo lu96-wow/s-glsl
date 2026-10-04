@@ -10,14 +10,26 @@
 
 (require "buffer.rkt")
 
-(provide gl-vec make-gl-vec gl-vec? gl-vec-width gl-vec->f32vector
+(provide vec-array make-vec-array vec-array? vec-array-width vec-array-data
+         ;; 旧名（deprecated，等价别名，下个大版本删）
+         gl-vec make-gl-vec gl-vec? gl-vec-width gl-vec->f32vector
          concat-vecs concat-vecs! concat-dvecs concat-dvecs!)
 
-(define (gl-vec . vs) (vec-buffer-from vs))
-(define make-gl-vec make-vec-buffer)
-(define gl-vec? vec-buffer?)
-(define gl-vec-width vec-buffer-width)
-(define gl-vec->f32vector vec-buffer-data)
+;; ---------- 新名：CPU 向量数组（vecN[]），不带 gl- ----------
+;; vec-buffer 里的 data 本来就是一条 f32vector，所以 vec-array-data 是零拷贝取数据；
+;; 需要“转换”（如 f64→f32）时用 convert.rkt 的 ->f32vector。
+(define (vec-array . vs) (vec-buffer-from vs))
+(define make-vec-array make-vec-buffer)
+(define vec-array? vec-buffer?)
+(define vec-array-width vec-buffer-width)
+(define vec-array-data vec-buffer-data)
+
+;; ---------- 旧名（deprecated，等价别名）----------
+(define gl-vec vec-array)
+(define make-gl-vec make-vec-array)
+(define gl-vec? vec-array?)
+(define gl-vec-width vec-array-width)
+(define gl-vec->f32vector vec-array-data)
 
 (define concat-vecs concat-vectors)
 (define concat-vecs! concat-vectors!)

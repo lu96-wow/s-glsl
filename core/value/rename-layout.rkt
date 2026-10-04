@@ -32,12 +32,21 @@
                [(s32) "~a->s32vector"]
                [(u32) "~a->u32vector"])
              "~a->bytes"))
+       ;; 混合类别时 pack 结果其实是 u8vector：补一个新名别名，旧名 Name->bytes 保留。
+       (define pack-alias
+         (if all-same?
+             #'(begin)
+             #`(define #,(format-id #'Name "~a->u8vector" #'Name)
+                 #,(format-id #'Name pack-fmt #'Name))))
        (with-syntax
          ([types-list   (datum->syntax #'Name type-syms)]
           [to-vec       (format-id #'Name pack-fmt #'Name)]
+          [pack-alias-def pack-alias]
           [stride-fn    (format-id #'Name "~a-stride" #'Name)]
+          [stride-bytes-fn (format-id #'Name "~a-stride-bytes" #'Name)]
           [field-offset (format-id #'Name "~a-field-offset" #'Name)]
           [field-size   (format-id #'Name "~a-field-size" #'Name)]
+          [field-components (format-id #'Name "~a-field-components" #'Name)]
           [(field-acc ...)
            (map (lambda (f) (format-id #'Name "~a-~a" #'Name f)) fields)]
           [(field-clause ...)
@@ -47,15 +56,20 @@
              (struct Name (field ...) #:transparent)
              (define (to-vec rec)
                (pack-record 'types-list (field-acc rec) ...))
-             (define (stride-fn)
+             pack-alias-def
+             ;; stride 新名带单位（字节）；旧名保留
+             (define (stride-bytes-fn)
                (record-stride-bytes 'types-list))
+             (define (stride-fn) (stride-bytes-fn))
              (define (field-offset f)
                (list-ref (record-field-offsets 'types-list)
                          (case f
                            field-clause ...
                            [else (error 'field-offset "未知字段：~s" f)])))
-             (define (field-size f)
+             ;; field 大小新名说清是“分量数”；旧名保留
+             (define (field-components f)
                (record-field-size 'types-list
                                   (case f
                                     field-clause ...
-                                    [else (error 'field-size "未知字段：~s" f)]))))))]))
+                                    [else (error 'field-size "未知字段：~s" f)])))
+             (define (field-size f) (field-components f)))))]))
